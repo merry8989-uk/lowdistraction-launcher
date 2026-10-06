@@ -21,6 +21,9 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.lowdistraction.launcher.bubble.AssistiveTouchService
+import com.lowdistraction.launcher.bubble.BubblePrefs
+import com.lowdistraction.launcher.bubble.FloatingBubbleService
 import kotlin.math.abs
 
 /**
@@ -35,7 +38,7 @@ import kotlin.math.abs
  * Gestures:
  *  - swipe right anywhere in the list  -> dialer
  *  - swipe left  anywhere in the list  -> camera
- *  - long-press the clock              -> manage hidden apps
+ *  - long-press the clock              -> hidden apps / assistive bubble menu
  *  - long-press an app                 -> app info / uninstall / hide
  */
 class MainActivity : Activity() {
@@ -71,7 +74,7 @@ class MainActivity : Activity() {
         val clock = findViewById<TextView>(R.id.clock)
         clock.isClickable = true
         clock.setOnLongClickListener {
-            showHiddenAppsDialog()
+            showMainMenu()
             true
         }
 
@@ -83,7 +86,18 @@ class MainActivity : Activity() {
 
         search.setOnEditorActionListener { _, actionId, _ -> handleSearchAction(actionId) }
 
+        if (intent?.getBooleanExtra(EXTRA_PICK_APPS, false) == true) {
+            showAppPicker()
+        }
+
         loadApps()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        if (intent.getBooleanExtra(EXTRA_PICK_APPS, false)) {
+            showAppPicker()
+        }
     }
 
     override fun onResume() {
@@ -153,6 +167,88 @@ class MainActivity : Activity() {
         }
         startSafely(intent)
         search.setText("")
+    }
+
+    // --------------------------------------------------------- long-press menu
+    private fun showMainMenu() {
+        val items = arrayOf(
+            getString(R.string.bubble_manage_hidden),
+            getString(R.string.bubble_settings)
+        )
+        AlertDialog.Builder(this)
+            .setItems(items) { _, which ->
+                when (which) {
+                    0 -> showHiddenAppsDialog()
+                    1 -> showBubbleDialog()
+                }
+            }
+            .show()
+    }
+
+    private fun showBubbleDialog() {
+        val items = arrayOf(
+            if (FloatingBubbleService.running) getString(R.string.bubble_stop)
+            else getString(R.string.bubble_start),
+            getString(R.string.bubble_pick_apps)
+        )
+        AlertDialog.Builder(this)
+            .setTitle(R.string.bubble_settings)
+            .setItems(items) { _, which ->
+                when (which) {
+                    0 -> if (FloatingBubbleService.running) stopBubble() else startBubble()
+                    1 -> showAppPicker()
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun startBubble() {
+        if (!Settings.canDrawOverlays(this)) {
+            Toast.makeText(this, R.string.bubble_need_overlay, Toast.LENGTH_LONG).show()
+            startActivity(
+                Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:$packageName")
+                )
+            )
+            return
+        }
+        if (!AssistiveTouchService.isReady) {
+            Toast.makeText(this, R.string.bubble_need_accessibility, Toast.LENGTH_LONG).show()
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        }
+        FloatingBubbleService.start(this)
+    }
+
+    private fun stopBubble() {
+        FloatingBubbleService.stop(this)
+    }
+
+    private fun showAppPicker() {
+        val apps = AppRepository.loadApps(this).filter { !hiddenApps.isHidden(it.packageName) }
+        if (apps.isEmpty()) return
+
+        val labels = apps.map { it.label }.toTypedArray()
+        val pinned = BubblePrefs(this).pinned().toSet()
+        val checked = BooleanArray(apps.size) {
+            apps[it].component.flattenToString() in pinned
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle(R.string.bubble_pick_apps)
+            .setMultiChoiceItems(labels, checked) { _, which, isChecked ->
+                checked[which] = isChecked
+            }
+            .setPositiveButton(android.R.string.ok) { _ ->
+                val chosen = apps.filterIndexed { index, _ -> checked[index] }
+                    .take(BubblePrefs.MAX)
+                    .map { it.component.flattenToString() }
+                BubblePrefs(this).setPinned(chosen)
+                Toast.makeText(this, R.string.bubble_saved, Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun showAppMenu(app: AppInfo, anchor: View) {
@@ -270,6 +366,7 @@ class MainActivity : Activity() {
     }
 
     companion object {
+        const val EXTRA_PICK_APPS = "pick_apps"
         private const val SWIPE_MIN = 100f
         private const val AUTO_OPEN_DELAY_MS = 350L
     }

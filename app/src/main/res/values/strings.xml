@@ -7,4 +7,42 @@
     <string name="action_hide">Hide app</string>
     <string name="hidden_apps">Hidden apps</string>
     <string name="no_hidden_apps">No hidden apps</string>
+
+    <!-- Assistive bubble -->
+    <string name="bubble_channel_name">Assistive bubble</string>
+    <string name="bubble_channel_description">Keeps the assistive touch bubble running.</string>
+    <string name="bubble_notification_title">Assistive bubble is on</string>
+    <string name="bubble_notification_text">Tap the bubble for quick actions</string>
+
+    <string name="accessibility_service_summary">Global navigation actions for the bubble</string>
+    <string name="accessibility_service_description">Lets the assistive bubble perform Back, Home, Recents and Lock-screen actions on your behalf. No screen content is read or stored.</string>
+
+    <string name="bubble_settings">Assistive bubble</string>
+    <string name="bubble_manage_hidden">Hidden apps</string>
+    <string name="bubble_start">Start bubble</string>
+    <string name="bubble_stop">Stop bubble</string>
+    <string name="bubble_pick_apps">Pick apps for the ring</string>
+    <string name="bubble_add_apps">Add apps</string>
+    <string name="bubble_no_apps">No apps pinned yet</string>
+    <string name="bubble_remove">Remove from ring</string>
+    <string name="bubble_need_overlay">Grant “Display over other apps” first</string>
+    <string name="bubble_need_accessibility">Enable the Assistive bubble accessibility service for Back / Home / Lock</string>
+    <string name="bubble_saved">Ring updated</string>
+
+    <!-- Settings shortcuts -->
+    <string name="qs_torch">Torch</string>
+    <string name="qs_sound">Sound</string>
+    <string name="qs_brightness">Brightness</string>
+    <string name="qs_focus">Focus mode</string>
+    <string name="qs_dnd">Do Not Disturb</string>
+    <string name="qs_bedtime">Bedtime mode</string>
+    <string name="qs_tea">Tea mode (5 min break)</string>
+    <string name="qs_unavailable">Not available on this device</string>
+
+    <!-- Tea mode -->
+    <string name="tea_mode_title">Tea mode</string>
+    <string name="tea_mode_subtitle">Take a 5 minute break. Nothing to do here.</string>
+    <string name="tea_mode_remaining">Time left: %1$s</string>
+    <string name="tea_mode_done">Break over. Welcome back.</string>
+    <string name="tea_mode_hold_to_exit">Hold here for 3 seconds to end early</string>
 </resources>

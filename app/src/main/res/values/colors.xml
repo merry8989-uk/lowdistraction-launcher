@@ -6,4 +6,11 @@
     <color name="textSecondary">#8A8A8E</color>
     <color name="accent">#9AE6B4</color>
     <color name="ic_launcher_background">#0B0B0C</color>
+
+    <!-- Assistive bubble -->
+    <color name="bubble_fill">#E617181A</color>
+    <color name="bubble_stroke">#669AE6B4</color>
+    <color name="slot_fill">#E617181A</color>
+    <color name="panel_fill">#F017181A</color>
+    <color name="scrim">#99000000</color>
 </resources>

@@ -13,8 +13,13 @@ of app names. Inspired by launchers like Olauncher.
   Pressing Enter / Search on the keyboard opens the top match.
 - Clock + date header (auto-updating `TextClock` widgets).
 - Long-press an app for a small menu: **App info**, **Uninstall**, **Hide app**.
-- Hidden apps are filtered out of the list; long-press the **clock** to see
-  and unhide them.
+- Hidden apps are filtered out of the list; long-press the **clock** →
+  *Hidden apps* to see and unhide them.
+- **Assistive bubble:** a draggable floating button. Single/double tap opens a
+  radial menu — up to 8 pinned apps around three nested circles
+  (inner = Back, middle = Home, outer = Lock). Long-press the bubble for a
+  device-shortcuts panel: Torch, Sound, Brightness, Focus mode, DND,
+  Bedtime mode, and Tea mode (a 5-minute break screen).
 - Gestures: swipe **right** in the list opens the dialer, swipe **left**
   opens the camera.
 - Registers as a HOME app, so you can set it as your default launcher.
@@ -145,6 +150,34 @@ No local toolchain needed for either.
   `gradle.properties` (e.g. `-Xmx1024m`) and stop other apps.
 - **`syntax error: unexpected ')'` from aapt2** — you are mixing an x86_64
   aapt2 with an arm64 one; remove any stale copies and rebuild.
+
+## Assistive bubble
+
+A floating, draggable bubble (like iOS AssistiveTouch) with three overlays:
+
+- **Single / double tap** → radial menu. The centre is three concentric
+  circles: **inner** = one step back, **middle** = go home, **outer** =
+  lock/sleep the screen. Around it sit up to 8 pinned apps plus a **+** slot to
+  add more (long-press a slot to remove it).
+- **Long press** → device-shortcuts panel: Torch, Sound, Brightness, Focus
+  mode, DND, Bedtime mode, Tea mode.
+
+Turn it on from the launcher: **long-press the clock → Assistive bubble**.
+
+Permissions it needs (grant them once):
+
+| Feature | What you must grant |
+| --- | --- |
+| Floating bubble | *Display over other apps* (Settings → Apps → Special access) |
+| Back / Home / Lock | enable the **Assistive bubble** accessibility service |
+| Brightness | *Modify system settings* |
+| Do Not Disturb | *Do Not Disturb access* |
+
+Honest limits: Android exposes **no public API** for Digital Wellbeing's
+*Focus mode* or *Bedtime mode*, so those buttons open the Digital Wellbeing
+settings screen rather than toggling silently. And a normal app cannot block
+the Home button, so **Tea mode** is a full-screen, Back-proof break screen —
+not an absolute lock (hold the hint 3 s to end it early).
 
 ## Extending it
 
