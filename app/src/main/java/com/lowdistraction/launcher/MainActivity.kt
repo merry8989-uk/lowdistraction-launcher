@@ -21,9 +21,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.lowdistraction.launcher.bubble.AssistiveTouchService
 import com.lowdistraction.launcher.bubble.BubblePrefs
-import com.lowdistraction.launcher.bubble.FloatingBubbleService
 import kotlin.math.abs
 
 /**
@@ -38,7 +36,7 @@ import kotlin.math.abs
  * Gestures:
  *  - swipe right anywhere in the list  -> dialer
  *  - swipe left  anywhere in the list  -> camera
- *  - long-press the clock              -> hidden apps / assistive bubble menu
+ *  - long-press ANYWHERE (empty space, clock, background) -> Settings
  *  - long-press an app                 -> app info / uninstall / hide
  */
 class MainActivity : Activity() {
@@ -71,12 +69,9 @@ class MainActivity : Activity() {
         list.adapter = adapter
         setupGestures(list)
 
-        val clock = findViewById<TextView>(R.id.clock)
-        clock.isClickable = true
-        clock.setOnLongClickListener {
-            showMainMenu()
-            true
-        }
+        // Long-press anywhere on the home screen opens Settings.
+        findViewById<View>(R.id.header).setOnLongClickListener { openSettings(); true }
+        findViewById<View>(R.id.root).setOnLongClickListener { openSettings(); true }
 
         search.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -110,6 +105,10 @@ class MainActivity : Activity() {
         super.onPause()
         // Never fire a queued auto-open while we are in the background.
         autoOpenHandler.removeCallbacksAndMessages(null)
+    }
+
+    private fun openSettings() {
+        startActivity(Intent(this, SettingsActivity::class.java))
     }
 
     private fun loadApps() {
@@ -169,60 +168,25 @@ class MainActivity : Activity() {
         search.setText("")
     }
 
-    // --------------------------------------------------------- long-press menu
-    private fun showMainMenu() {
-        val items = arrayOf(
-            getString(R.string.bubble_manage_hidden),
-            getString(R.string.bubble_settings)
+    private fun showAppMenu(app: AppInfo, anchor: View) {
+        val options = arrayOf(
+            getString(R.string.action_app_info),
+            getString(R.string.action_uninstall),
+            getString(R.string.action_hide)
         )
         AlertDialog.Builder(this)
-            .setItems(items) { _, which ->
+            .setTitle(app.label)
+            .setItems(options) { _, which ->
                 when (which) {
-                    0 -> showHiddenAppsDialog()
-                    1 -> showBubbleDialog()
+                    0 -> openAppInfo(app)
+                    1 -> uninstall(app)
+                    2 -> {
+                        hiddenApps.hide(app.packageName)
+                        loadApps()
+                    }
                 }
             }
             .show()
-    }
-
-    private fun showBubbleDialog() {
-        val items = arrayOf(
-            if (FloatingBubbleService.running) getString(R.string.bubble_stop)
-            else getString(R.string.bubble_start),
-            getString(R.string.bubble_pick_apps)
-        )
-        AlertDialog.Builder(this)
-            .setTitle(R.string.bubble_settings)
-            .setItems(items) { _, which ->
-                when (which) {
-                    0 -> if (FloatingBubbleService.running) stopBubble() else startBubble()
-                    1 -> showAppPicker()
-                }
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
-    }
-
-    private fun startBubble() {
-        if (!Settings.canDrawOverlays(this)) {
-            Toast.makeText(this, R.string.bubble_need_overlay, Toast.LENGTH_LONG).show()
-            startActivity(
-                Intent(
-                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    Uri.parse("package:$packageName")
-                )
-            )
-            return
-        }
-        if (!AssistiveTouchService.isReady) {
-            Toast.makeText(this, R.string.bubble_need_accessibility, Toast.LENGTH_LONG).show()
-            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-        }
-        FloatingBubbleService.start(this)
-    }
-
-    private fun stopBubble() {
-        FloatingBubbleService.stop(this)
     }
 
     private fun showAppPicker() {
@@ -251,52 +215,6 @@ class MainActivity : Activity() {
             .show()
     }
 
-    private fun showAppMenu(app: AppInfo, anchor: View) {
-        val options = arrayOf(
-            getString(R.string.action_app_info),
-            getString(R.string.action_uninstall),
-            getString(R.string.action_hide)
-        )
-        AlertDialog.Builder(this)
-            .setTitle(app.label)
-            .setItems(options) { _, which ->
-                when (which) {
-                    0 -> openAppInfo(app)
-                    1 -> uninstall(app)
-                    2 -> {
-                        hiddenApps.hide(app.packageName)
-                        loadApps()
-                    }
-                }
-            }
-            .show()
-    }
-
-    private fun showHiddenAppsDialog() {
-        val pkgs = hiddenApps.all().toList()
-        if (pkgs.isEmpty()) {
-            Toast.makeText(this, R.string.no_hidden_apps, Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val labels = pkgs.map { pkg ->
-            try {
-                packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
-            } catch (_: Exception) {
-                pkg
-            }
-        }.toTypedArray()
-
-        AlertDialog.Builder(this)
-            .setTitle(R.string.hidden_apps)
-            .setItems(labels) { _, which ->
-                hiddenApps.unhide(pkgs[which])
-                loadApps()
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
-    }
-
     private fun setupGestures(list: RecyclerView) {
         val detector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
             override fun onDown(e: MotionEvent): Boolean = true
@@ -311,12 +229,24 @@ class MainActivity : Activity() {
                 }
                 return false
             }
+
+            override fun onLongPress(e: MotionEvent) {
+                // Only when the press is NOT on an app row (that opens the app
+                // menu instead).
+                if (list.findChildViewUnder(e.x, e.y) == null) {
+                    openSettings()
+                }
+            }
         })
 
-        list.setOnTouchListener { _, event ->
-            detector.onTouchEvent(event)
-            false // do not consume, so the list still scrolls normally
-        }
+        // addOnItemTouchListener sees every event before the rows consume it,
+        // so swipes and long-presses work even over the list.
+        list.addOnItemTouchListener(object : RecyclerView.SimpleOnItemTouchListener() {
+            override fun onInterceptTouchEvent(rv: RecyclerView, e: MotionEvent): Boolean {
+                detector.onTouchEvent(e)
+                return false
+            }
+        })
     }
 
     private fun openDialer() {

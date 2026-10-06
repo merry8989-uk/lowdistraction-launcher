@@ -8,6 +8,22 @@
     <string name="hidden_apps">Hidden apps</string>
     <string name="no_hidden_apps">No hidden apps</string>
 
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_back">Back</string>
+    <string name="settings_section_bubble">ASSISTIVE BUBBLE</string>
+    <string name="settings_section_launcher">LAUNCHER</string>
+    <string name="settings_section_about">ABOUT</string>
+    <string name="settings_row_pick_apps">Apps in the ring</string>
+    <string name="settings_row_overlay">Display over other apps</string>
+    <string name="settings_row_accessibility">Accessibility service</string>
+    <string name="settings_row_hidden">Hidden apps</string>
+    <string name="settings_row_contact">Ask for more features</string>
+    <string name="settings_hint_long_press">Long-press anywhere on the home screen to open this.</string>
+    <string name="contact_instagram">@osintgram_io</string>
+    <string name="contact_instagram_url" translatable="false">https://instagram.com/osintgram_io</string>
+    <string name="settings_no_trackers">This app has no analytics and no trackers. The link above is just a plain web link you can tap — nothing is sent anywhere by the app itself.</string>
+
     <!-- Assistive bubble -->
     <string name="bubble_channel_name">Assistive bubble</string>
     <string name="bubble_channel_description">Keeps the assistive touch bubble running.</string>

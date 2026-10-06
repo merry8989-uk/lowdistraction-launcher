@@ -22,6 +22,9 @@ of app names. Inspired by launchers like Olauncher.
   Bedtime mode, and Tea mode (a 5-minute break screen).
 - Gestures: swipe **right** in the list opens the dialer, swipe **left**
   opens the camera.
+- **Settings:** long-press anywhere on the home screen (empty space, clock or
+  background) to open Settings — the assistive-bubble on/off switch, ring apps,
+  hidden apps, and a contact link all live there.
 - Registers as a HOME app, so you can set it as your default launcher.
 - Dark, monospace, distraction-free styling.
 
@@ -162,7 +165,8 @@ A floating, draggable bubble (like iOS AssistiveTouch) with three overlays:
 - **Long press** → device-shortcuts panel: Torch, Sound, Brightness, Focus
   mode, DND, Bedtime mode, Tea mode.
 
-Turn it on from the launcher: **long-press the clock → Assistive bubble**.
+Turn it on from **Settings** (long-press anywhere on the home screen): there is
+a single switch to enable or disable the bubble.
 
 Permissions it needs (grant them once):
 
@@ -178,6 +182,12 @@ Honest limits: Android exposes **no public API** for Digital Wellbeing's
 settings screen rather than toggling silently. And a normal app cannot block
 the Home button, so **Tea mode** is a full-screen, Back-proof break screen —
 not an absolute lock (hold the hint 3 s to end it early).
+
+## Contact
+
+The Settings screen has a plain **Ask for more features** link to
+`@osintgram_io` on Instagram. It is a normal web link — the app ships with no
+analytics, no crash reporting and no trackers of any kind.
 
 ## Extending it
 
