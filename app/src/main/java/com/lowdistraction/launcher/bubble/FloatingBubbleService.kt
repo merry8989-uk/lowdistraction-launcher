@@ -138,7 +138,7 @@ class FloatingBubbleService : Service() {
             return
         }
         val (sw, sh) = screenSize()
-        val menu = BubbleMenu(
+        val menu = RadialMenuView(
             context = this,
             screenW = sw,
             screenH = sh,
@@ -158,7 +158,6 @@ class FloatingBubbleService : Service() {
             },
             onDismiss = { removeOverlay() }
         )
-        val view = menu.build()
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
@@ -167,8 +166,8 @@ class FloatingBubbleService : Service() {
                 WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT
         )
-        wm.addView(view, params)
-        overlay = view
+        wm.addView(menu, params)
+        overlay = menu
     }
 
     private fun rebuildMenu() {

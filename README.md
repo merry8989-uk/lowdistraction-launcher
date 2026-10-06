@@ -161,10 +161,11 @@ No local toolchain needed for either.
 
 A floating, draggable bubble (like iOS AssistiveTouch) with three overlays:
 
-- **Single / double tap** → radial menu. The centre is three concentric
-  circles: **inner** = one step back, **middle** = go home, **outer** =
-  lock/sleep the screen. Around it sit up to 8 pinned apps plus a **+** slot to
-  add more (long-press a slot to remove it).
+- **Single / double tap** → radial menu, which is a **spin wheel**: drag the
+  ring to rotate it and it keeps spinning with momentum before settling. The
+  centre is three concentric circles: **inner** = one step back, **middle** =
+  go home, **outer** = lock/sleep the screen. Around it sit up to 8 pinned apps
+  plus a **+** slot to add more (long-press a slot to remove it).
 - **Long press** → device-shortcuts panel: Torch, Sound, Brightness, Focus
   mode, DND, Bedtime mode, Tea mode.
 
