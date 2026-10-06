@@ -33,7 +33,7 @@ class RadialMenuView(
     screenH: Int,
     anchorX: Int,
     anchorY: Int,
-    apps: List<AppInfo>,
+    private val apps: List<AppInfo>,
     private val onApp: (AppInfo) -> Unit,
     private val onRemoveApp: (AppInfo) -> Unit,
     private val onAddApps: () -> Unit,
