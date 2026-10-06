@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Low Distraction</string>
+    <string name="search_hint">Search apps</string>
+    <string name="no_apps">No apps found</string>
+    <string name="action_app_info">App info</string>
+    <string name="action_uninstall">Uninstall</string>
+</resources>

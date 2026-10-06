@@ -1,1 +1,139 @@
-# lowdistraction-launcher
+# Low Distraction Launcher
+
+A minimal, text-only Android home screen written in Kotlin. No icons, no
+widgets, no folders — just the clock, a search box and an alphabetical list
+of app names. Inspired by launchers like Olauncher.
+
+## Features
+
+- Text-only alphabetical list of installed launchable apps (RecyclerView).
+- Live search / filter as you type.
+- Clock + date header (auto-updating `TextClock` widgets).
+- Long-press an app for a small menu: **App info** and **Uninstall**.
+- Registers as a HOME app, so you can set it as your default launcher.
+- Dark, monospace, distraction-free styling.
+
+## Project layout
+
+```
+lowdistraction-launcher/
+├── settings.gradle.kts
+├── build.gradle.kts
+├── gradle.properties
+├── gradlew / gradlew.bat / gradle/wrapper/…
+└── app/
+    ├── build.gradle.kts
+    └── src/main/
+        ├── AndroidManifest.xml
+        ├── java/com/lowdistraction/launcher/
+        │   ├── AppInfo.kt          # data class for one app
+        │   ├── AppRepository.kt    # loads + sorts launchable apps
+        │   ├── AppListAdapter.kt   # text-only RecyclerView adapter
+        │   └── MainActivity.kt     # home screen logic
+        └── res/
+            ├── layout/activity_main.xml
+            ├── layout/item_app.xml
+            ├── values/{strings,colors,themes}.xml
+            ├── drawable/{search_bg,ic_launcher_foreground}.xml
+            └── mipmap-anydpi-v26/ic_launcher.xml
+```
+
+## Requirements
+
+- Android SDK Platform **34** and Build-Tools **34.0.0**
+- JDK 17
+- Gradle 8.x (the wrapper pins 8.2)
+- Android Gradle Plugin 8.1.4, Kotlin 1.9.22
+- `minSdk 26` (Android 8.0), `targetSdk 34`
+
+> Why 34 and not 35? Termux's arm64 `aapt2` currently tops out at compileSdk 34.
+> If you build on a PC you can bump to 35 safely.
+
+## Building in Termux (aarch64, no root, no PC)
+
+The one real obstacle on aarch64 Termux is `aapt2`: Google only ships an
+x86_64 binary, so Gradle's bundled copy can't run. The fix is to install
+Termux's own arm64 `aapt2` and point Gradle at it.
+
+```bash
+# 1. Toolchain
+pkg update && pkg upgrade -y
+pkg install -y openjdk-17 gradle aapt2 wget unzip
+
+# 2. Android SDK (command-line tools)
+export ANDROID_HOME="$HOME/android-sdk"
+mkdir -p "$ANDROID_HOME/cmdline-tools"
+cd "$ANDROID_HOME"
+wget -O clt.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+unzip -q clt.zip
+mv cmdline-tools latest
+mv latest "$ANDROID_HOME/cmdline-tools/"
+
+export JAVA_HOME="$PREFIX/lib/jvm/java-17-openjdk"
+export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
+
+yes | sdkmanager --licenses
+sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+
+# 3. Point Gradle at the arm64 aapt2 (put it in your USER config, not the repo)
+mkdir -p ~/.gradle
+echo "android.aapt2FromMavenOverride=$PREFIX/bin/aapt2" >> ~/.gradle/gradle.properties
+
+# 4. Build
+cd ~/lowdistraction-launcher
+chmod +x gradlew
+echo "sdk.dir=$ANDROID_HOME" > local.properties
+./gradlew assembleDebug
+```
+
+The APK lands at:
+
+```
+app/build/outputs/apk/debug/app-debug.apk
+```
+
+If `./gradlew` gives you trouble, you can skip the wrapper and use the
+system Gradle instead:
+
+```bash
+gradle assembleDebug
+```
+
+## Installing it on the phone
+
+```bash
+cp app/build/outputs/apk/debug/app-debug.apk /sdcard/Download/
+```
+
+Then open the file with a file manager and install it (allow "install
+unknown apps" for that file manager). Finally go to
+**Settings → Apps → Default apps → Home app** and pick **Low Distraction**.
+
+## Troubleshooting (Termux)
+
+- **`AAPT2 … Daemon startup failed`** — Gradle is using its bundled x86_64
+  aapt2. Make sure `~/.gradle/gradle.properties` contains the
+  `android.aapt2FromMavenOverride` line pointing at `$PREFIX/bin/aapt2`.
+- **`Failed to install build-tools`** — run `sdkmanager "build-tools;34.0.0"`
+  again and accept licenses with `yes | sdkmanager --licenses`.
+- **`SDK location not found`** — you are missing `local.properties`
+  (`sdk.dir=…`) or the `ANDROID_HOME` env var.
+- **Out of memory during the build** — lower `org.gradle.jvmargs` in
+  `gradle.properties` (e.g. `-Xmx1024m`) and stop other apps.
+- **`syntax error: unexpected ')'` from aapt2** — you are mixing an x86_64
+  aapt2 with an arm64 one; remove any stale copies and rebuild.
+
+## Building in the cloud instead (optional)
+
+If the on-device build is painful, push the repo to GitHub — the included
+`.github/workflows/build.yml` builds a debug APK on every push and uploads
+it as a downloadable artifact. No local toolchain needed.
+
+## Extending it
+
+- **Hide apps:** keep a `Set<String>` of package names in
+  `SharedPreferences` and filter them out in `AppRepository.loadApps`.
+- **Gestures:** override `onTouch` in `MainActivity` (swipe up = search,
+  swipe right = dialer, etc.).
+- **Double-tap to lock screen:** use `DevicePolicyManager` (needs the
+  device-admin permission).
