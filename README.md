@@ -8,6 +8,9 @@ of app names. Inspired by launchers like Olauncher.
 
 - Text-only alphabetical list of installed launchable apps (RecyclerView).
 - Live search / filter as you type.
+- Auto-open on unique match: when a query narrows the list to exactly one
+  app, it launches by itself after a short pause (keep typing to cancel).
+  Pressing Enter / Search on the keyboard opens the top match.
 - Clock + date header (auto-updating `TextClock` widgets).
 - Long-press an app for a small menu: **App info**, **Uninstall**, **Hide app**.
 - Hidden apps are filtered out of the list; long-press the **clock** to see

@@ -6,6 +6,8 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.MediaStore
 import android.provider.Settings
 import android.text.Editable
@@ -13,6 +15,7 @@ import android.text.TextWatcher
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.View
+import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
@@ -22,6 +25,12 @@ import kotlin.math.abs
 
 /**
  * The home screen: clock + date, a search box, and a text-only app list.
+ *
+ * Search behaviour:
+ *  - When a query narrows the list down to exactly ONE app, that app opens
+ *    automatically after a short pause (AUTO_OPEN_DELAY_MS). Keep typing and
+ *    the pending open is cancelled.
+ *  - Pressing Enter/Search on the keyboard opens the top match.
  *
  * Gestures:
  *  - swipe right anywhere in the list  -> dialer
@@ -37,6 +46,9 @@ class MainActivity : Activity() {
     private lateinit var hiddenApps: HiddenApps
 
     private var allApps: List<AppInfo> = emptyList()
+    private var currentResults: List<AppInfo> = emptyList()
+
+    private val autoOpenHandler = Handler(Looper.getMainLooper())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -69,6 +81,8 @@ class MainActivity : Activity() {
             override fun afterTextChanged(s: Editable?) = filter(s?.toString().orEmpty())
         })
 
+        search.setOnEditorActionListener { _, actionId, _ -> handleSearchAction(actionId) }
+
         loadApps()
     }
 
@@ -76,6 +90,12 @@ class MainActivity : Activity() {
         super.onResume()
         // Reload so newly installed / removed apps show up without a restart.
         if (allApps.isNotEmpty()) loadApps()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // Never fire a queued auto-open while we are in the background.
+        autoOpenHandler.removeCallbacksAndMessages(null)
     }
 
     private fun loadApps() {
@@ -89,6 +109,9 @@ class MainActivity : Activity() {
     }
 
     private fun filter(query: String) {
+        // Any change to the query cancels a pending auto-open.
+        autoOpenHandler.removeCallbacksAndMessages(null)
+
         val q = query.trim().lowercase()
         val visible = allApps.filter { !hiddenApps.isHidden(it.packageName) }
         val filtered = if (q.isEmpty()) {
@@ -96,8 +119,30 @@ class MainActivity : Activity() {
         } else {
             visible.filter { it.label.lowercase().contains(q) }
         }
+
+        currentResults = filtered
         adapter.submit(filtered)
         emptyView.visibility = if (filtered.isEmpty()) View.VISIBLE else View.GONE
+
+        // Auto-open the app once the query has narrowed down to exactly one.
+        if (q.isNotEmpty() && filtered.size == 1) {
+            val target = filtered.first()
+            autoOpenHandler.postDelayed({ launch(target) }, AUTO_OPEN_DELAY_MS)
+        }
+    }
+
+    private fun handleSearchAction(actionId: Int): Boolean {
+        val submitted = actionId == EditorInfo.IME_ACTION_SEARCH ||
+            actionId == EditorInfo.IME_ACTION_DONE ||
+            actionId == EditorInfo.IME_ACTION_GO
+        if (submitted) {
+            currentResults.firstOrNull()?.let { app ->
+                autoOpenHandler.removeCallbacksAndMessages(null)
+                launch(app)
+                return true
+            }
+        }
+        return false
     }
 
     private fun launch(app: AppInfo) {
@@ -226,5 +271,6 @@ class MainActivity : Activity() {
 
     companion object {
         private const val SWIPE_MIN = 100f
+        private const val AUTO_OPEN_DELAY_MS = 350L
     }
 }
