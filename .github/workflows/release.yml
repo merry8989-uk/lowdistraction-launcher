@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to create the release under (e.g. v1.1)'
+        description: 'Tag to create the release under (e.g. v1.6)'
         required: true
 
 permissions:
@@ -30,20 +30,29 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          # Do NOT include the legacy "tools" package: it was removed from the
-          # SDK repository and makes sdkmanager exit 1. Pin only what we need.
           packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+
+      - name: Decode signing keystore
+        run: |
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/release.keystore"
+          fi
 
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      - name: Build debug APK
-        run: ./gradlew assembleDebug --no-daemon
+      - name: Build signed release APK
+        env:
+          SIGNING_KEYSTORE: ${{ runner.temp }}/release.keystore
+          SIGNING_STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew assembleRelease --no-daemon
 
       - name: Rename APK
         run: |
           mkdir -p dist
-          cp app/build/outputs/apk/debug/app-debug.apk dist/lowdistraction-${{ github.event.inputs.tag || github.ref_name }}.apk
+          cp app/build/outputs/apk/release/app-release.apk dist/lowdistraction-${{ github.event.inputs.tag || github.ref_name }}.apk
 
       - name: Publish release
         uses: softprops/action-gh-release@v2

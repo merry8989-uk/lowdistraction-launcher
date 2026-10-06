@@ -192,6 +192,21 @@ The Settings screen has a plain **Ask for more features** link to
 `@osintgram_io` on Instagram. It is a normal web link — the app ships with no
 analytics, no crash reporting and no trackers of any kind.
 
+## Signing
+
+The CI builds a **signed release APK** using a fixed keystore, so every build
+shares one signature and Android can update in place — no more "App not
+installed" when installing a newer build over an older one.
+
+The keystore lives in four repository secrets (never in the repo):
+`KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`. When the
+secrets are missing, the release build silently falls back to the debug key so
+a local `./gradlew assembleRelease` still works.
+
+> Keep a backup of the keystore and its password. If they are lost you can
+> never publish an update with the same signature again — you would have to
+> uninstall and reinstall.
+
 ## Extending it
 
 - **Double-tap to lock screen:** use `DevicePolicyManager` (needs the

@@ -3,6 +3,14 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+// Release signing is driven by environment variables so CI can inject the
+// keystore through repository secrets. When they are absent (a plain local
+// build), the release build falls back to the debug key so it still compiles.
+val signingKeystorePath = System.getenv("SIGNING_KEYSTORE")
+val signingKeystoreFile = signingKeystorePath?.let { file(it) }
+val hasReleaseSigning = signingKeystoreFile != null &&
+    signingKeystoreFile.exists() && signingKeystoreFile.length() > 0L
+
 android {
     namespace = "com.lowdistraction.launcher"
     compileSdk = 34
@@ -11,13 +19,30 @@ android {
         applicationId = "com.lowdistraction.launcher"
         minSdk = 26
         targetSdk = 34
-        versionCode = 6
-        versionName = "1.5"
+        versionCode = 7
+        versionName = "1.6"
+    }
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = signingKeystoreFile
+                storePassword = System.getenv("SIGNING_STORE_PASSWORD")
+                keyAlias = System.getenv("SIGNING_KEY_ALIAS")
+                keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
+                storeType = "PKCS12"
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = if (hasReleaseSigning) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
