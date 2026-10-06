@@ -18,6 +18,11 @@
     <string name="settings_row_overlay">Display over other apps</string>
     <string name="settings_row_accessibility">Accessibility service</string>
     <string name="settings_row_hidden">Hidden apps</string>
+    <string name="settings_row_default">Set as default launcher</string>
+    <string name="set_default_title">Set as default launcher</string>
+    <string name="set_default_message">Make Low Distraction your home screen? Android will ask you to confirm.</string>
+    <string name="set_default_ok">Set default</string>
+    <string name="set_default_later">Not now</string>
     <string name="settings_row_contact">Ask for more features</string>
     <string name="settings_hint_long_press">Long-press anywhere on the home screen to open this.</string>
     <string name="contact_instagram">@osintgram_io</string>

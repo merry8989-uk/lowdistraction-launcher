@@ -138,6 +138,18 @@
             android:textSize="17sp"
             android:fontFamily="monospace" />
 
+        <TextView
+            android:id="@+id/row_default"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="?android:attr/selectableItemBackground"
+            android:paddingTop="14dp"
+            android:paddingBottom="14dp"
+            android:text="@string/settings_row_default"
+            android:textColor="@color/textPrimary"
+            android:textSize="17sp"
+            android:fontFamily="monospace" />
+
         <!-- About -->
         <TextView
             android:layout_width="wrap_content"

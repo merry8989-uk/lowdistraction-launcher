@@ -43,6 +43,8 @@ class SettingsActivity : Activity() {
 
         findViewById<View>(R.id.row_hidden).setOnClickListener { showHiddenAppsDialog() }
 
+        findViewById<View>(R.id.row_default).setOnClickListener { HomeRole.request(this) }
+
         findViewById<View>(R.id.row_contact).setOnClickListener { openInstagram() }
     }
 

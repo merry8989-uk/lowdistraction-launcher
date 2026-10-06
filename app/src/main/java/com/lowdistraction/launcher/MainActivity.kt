@@ -81,6 +81,8 @@ class MainActivity : Activity() {
 
         search.setOnEditorActionListener { _, actionId, _ -> handleSearchAction(actionId) }
 
+        maybePromptDefaultLauncher()
+
         if (intent?.getBooleanExtra(EXTRA_PICK_APPS, false) == true) {
             showAppPicker()
         }
@@ -105,6 +107,24 @@ class MainActivity : Activity() {
         super.onPause()
         // Never fire a queued auto-open while we are in the background.
         autoOpenHandler.removeCallbacksAndMessages(null)
+    }
+
+    /**
+     * On the first launch, if we are not already the home app, ask the user to
+     * set us as the default launcher. Shown only once.
+     */
+    private fun maybePromptDefaultLauncher() {
+        val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
+        if (prefs.getBoolean(KEY_PROMPT_SHOWN, false)) return
+        if (HomeRole.isDefault(this)) return
+        prefs.edit().putBoolean(KEY_PROMPT_SHOWN, true).apply()
+
+        AlertDialog.Builder(this)
+            .setTitle(R.string.set_default_title)
+            .setMessage(R.string.set_default_message)
+            .setPositiveButton(R.string.set_default_ok) { _, _ -> HomeRole.request(this) }
+            .setNegativeButton(R.string.set_default_later, null)
+            .show()
     }
 
     private fun openSettings() {
@@ -297,6 +317,8 @@ class MainActivity : Activity() {
 
     companion object {
         const val EXTRA_PICK_APPS = "pick_apps"
+        private const val PREFS = "launcher_prefs"
+        private const val KEY_PROMPT_SHOWN = "default_prompt_shown"
         private const val SWIPE_MIN = 100f
         private const val AUTO_OPEN_DELAY_MS = 350L
     }
