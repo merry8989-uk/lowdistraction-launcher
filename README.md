@@ -9,7 +9,11 @@ of app names. Inspired by launchers like Olauncher.
 - Text-only alphabetical list of installed launchable apps (RecyclerView).
 - Live search / filter as you type.
 - Clock + date header (auto-updating `TextClock` widgets).
-- Long-press an app for a small menu: **App info** and **Uninstall**.
+- Long-press an app for a small menu: **App info**, **Uninstall**, **Hide app**.
+- Hidden apps are filtered out of the list; long-press the **clock** to see
+  and unhide them.
+- Gestures: swipe **right** in the list opens the dialer, swipe **left**
+  opens the camera.
 - Registers as a HOME app, so you can set it as your default launcher.
 - Dark, monospace, distraction-free styling.
 
@@ -21,6 +25,7 @@ lowdistraction-launcher/
 ├── build.gradle.kts
 ├── gradle.properties
 ├── gradlew / gradlew.bat / gradle/wrapper/…
+├── .github/workflows/{build.yml,release.yml}
 └── app/
     ├── build.gradle.kts
     └── src/main/
@@ -29,7 +34,8 @@ lowdistraction-launcher/
         │   ├── AppInfo.kt          # data class for one app
         │   ├── AppRepository.kt    # loads + sorts launchable apps
         │   ├── AppListAdapter.kt   # text-only RecyclerView adapter
-        │   └── MainActivity.kt     # home screen logic
+        │   ├── HiddenApps.kt       # SharedPreferences-backed hide list
+        │   └── MainActivity.kt     # home screen logic + gestures
         └── res/
             ├── layout/activity_main.xml
             ├── layout/item_app.xml
@@ -92,12 +98,8 @@ The APK lands at:
 app/build/outputs/apk/debug/app-debug.apk
 ```
 
-If `./gradlew` gives you trouble, you can skip the wrapper and use the
-system Gradle instead:
-
-```bash
-gradle assembleDebug
-```
+If `./gradlew` gives you trouble, skip the wrapper and use system Gradle:
+`gradle assembleDebug`.
 
 ## Installing it on the phone
 
@@ -108,6 +110,24 @@ cp app/build/outputs/apk/debug/app-debug.apk /sdcard/Download/
 Then open the file with a file manager and install it (allow "install
 unknown apps" for that file manager). Finally go to
 **Settings → Apps → Default apps → Home app** and pick **Low Distraction**.
+
+## Building in the cloud (recommended)
+
+Push the repo to GitHub and you get two workflows for free:
+
+- **`.github/workflows/build.yml`** — builds a debug APK on every push and
+  uploads it as a downloadable artifact (Actions tab → run → Artifacts).
+- **`.github/workflows/release.yml`** — builds the APK and attaches it to a
+  GitHub **Release**. Trigger it by pushing a tag:
+
+  ```bash
+  git tag v1.1 && git push origin v1.1
+  ```
+
+  or run it manually from the Actions tab and type a tag name. The APK shows
+  up on the repo's Releases page, ready to download and install.
+
+No local toolchain needed for either.
 
 ## Troubleshooting (Termux)
 
@@ -123,17 +143,10 @@ unknown apps" for that file manager). Finally go to
 - **`syntax error: unexpected ')'` from aapt2** — you are mixing an x86_64
   aapt2 with an arm64 one; remove any stale copies and rebuild.
 
-## Building in the cloud instead (optional)
-
-If the on-device build is painful, push the repo to GitHub — the included
-`.github/workflows/build.yml` builds a debug APK on every push and uploads
-it as a downloadable artifact. No local toolchain needed.
-
 ## Extending it
 
-- **Hide apps:** keep a `Set<String>` of package names in
-  `SharedPreferences` and filter them out in `AppRepository.loadApps`.
-- **Gestures:** override `onTouch` in `MainActivity` (swipe up = search,
-  swipe right = dialer, etc.).
 - **Double-tap to lock screen:** use `DevicePolicyManager` (needs the
   device-admin permission).
+- **More gestures:** add cases to `onFling` in `MainActivity.setupGestures`
+  (e.g. swipe up = open search and focus it).
+- **Favourites row:** pin a few package names above the alphabetical list.

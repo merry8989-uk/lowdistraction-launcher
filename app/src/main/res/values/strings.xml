@@ -4,4 +4,7 @@
     <string name="no_apps">No apps found</string>
     <string name="action_app_info">App info</string>
     <string name="action_uninstall">Uninstall</string>
+    <string name="action_hide">Hide app</string>
+    <string name="hidden_apps">Hidden apps</string>
+    <string name="no_hidden_apps">No hidden apps</string>
 </resources>

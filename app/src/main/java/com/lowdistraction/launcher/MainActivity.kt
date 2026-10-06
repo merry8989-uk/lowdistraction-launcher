@@ -6,23 +6,35 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.provider.MediaStore
 import android.provider.Settings
 import android.text.Editable
 import android.text.TextWatcher
+import android.view.GestureDetector
+import android.view.MotionEvent
 import android.view.View
 import android.widget.EditText
 import android.widget.TextView
+import android.widget.Toast
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import kotlin.math.abs
 
 /**
  * The home screen: clock + date, a search box, and a text-only app list.
+ *
+ * Gestures:
+ *  - swipe right anywhere in the list  -> dialer
+ *  - swipe left  anywhere in the list  -> camera
+ *  - long-press the clock              -> manage hidden apps
+ *  - long-press an app                 -> app info / uninstall / hide
  */
 class MainActivity : Activity() {
 
     private lateinit var adapter: AppListAdapter
     private lateinit var emptyView: TextView
     private lateinit var search: EditText
+    private lateinit var hiddenApps: HiddenApps
 
     private var allApps: List<AppInfo> = emptyList()
 
@@ -30,6 +42,7 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        hiddenApps = HiddenApps(this)
         emptyView = findViewById(R.id.empty)
         search = findViewById(R.id.search)
 
@@ -41,6 +54,14 @@ class MainActivity : Activity() {
         val list = findViewById<RecyclerView>(R.id.appList)
         list.layoutManager = LinearLayoutManager(this)
         list.adapter = adapter
+        setupGestures(list)
+
+        val clock = findViewById<TextView>(R.id.clock)
+        clock.isClickable = true
+        clock.setOnLongClickListener {
+            showHiddenAppsDialog()
+            true
+        }
 
         search.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -69,10 +90,11 @@ class MainActivity : Activity() {
 
     private fun filter(query: String) {
         val q = query.trim().lowercase()
+        val visible = allApps.filter { !hiddenApps.isHidden(it.packageName) }
         val filtered = if (q.isEmpty()) {
-            allApps
+            visible
         } else {
-            allApps.filter { it.label.lowercase().contains(q) }
+            visible.filter { it.label.lowercase().contains(q) }
         }
         adapter.submit(filtered)
         emptyView.visibility = if (filtered.isEmpty()) View.VISIBLE else View.GONE
@@ -89,39 +111,108 @@ class MainActivity : Activity() {
     }
 
     private fun showAppMenu(app: AppInfo, anchor: View) {
-        val options = arrayOf(getString(R.string.action_app_info), getString(R.string.action_uninstall))
+        val options = arrayOf(
+            getString(R.string.action_app_info),
+            getString(R.string.action_uninstall),
+            getString(R.string.action_hide)
+        )
         AlertDialog.Builder(this)
             .setTitle(app.label)
             .setItems(options) { _, which ->
                 when (which) {
                     0 -> openAppInfo(app)
                     1 -> uninstall(app)
+                    2 -> {
+                        hiddenApps.hide(app.packageName)
+                        loadApps()
+                    }
                 }
             }
             .show()
     }
 
-    private fun openAppInfo(app: AppInfo) {
-        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-            data = Uri.fromParts("package", app.packageName, null)
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+    private fun showHiddenAppsDialog() {
+        val pkgs = hiddenApps.all().toList()
+        if (pkgs.isEmpty()) {
+            Toast.makeText(this, R.string.no_hidden_apps, Toast.LENGTH_SHORT).show()
+            return
         }
-        startSafely(intent)
+
+        val labels = pkgs.map { pkg ->
+            try {
+                packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
+            } catch (_: Exception) {
+                pkg
+            }
+        }.toTypedArray()
+
+        AlertDialog.Builder(this)
+            .setTitle(R.string.hidden_apps)
+            .setItems(labels) { _, which ->
+                hiddenApps.unhide(pkgs[which])
+                loadApps()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun setupGestures(list: RecyclerView) {
+        val detector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDown(e: MotionEvent): Boolean = true
+
+            override fun onFling(e1: MotionEvent?, e2: MotionEvent, vx: Float, vy: Float): Boolean {
+                val start = e1 ?: return false
+                val dx = e2.x - start.x
+                val dy = e2.y - start.y
+                if (abs(dx) > abs(dy) && abs(dx) > SWIPE_MIN) {
+                    if (dx > 0) openDialer() else openCamera()
+                    return true
+                }
+                return false
+            }
+        })
+
+        list.setOnTouchListener { _, event ->
+            detector.onTouchEvent(event)
+            false // do not consume, so the list still scrolls normally
+        }
+    }
+
+    private fun openDialer() {
+        startSafely(Intent(Intent.ACTION_DIAL).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK })
+    }
+
+    private fun openCamera() {
+        startSafely(
+            Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+        )
+    }
+
+    private fun openAppInfo(app: AppInfo) {
+        startSafely(
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.fromParts("package", app.packageName, null)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+        )
     }
 
     private fun uninstall(app: AppInfo) {
-        val intent = Intent(Intent.ACTION_DELETE).apply {
-            data = Uri.fromParts("package", app.packageName, null)
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK
-        }
-        startSafely(intent)
+        startSafely(
+            Intent(Intent.ACTION_DELETE).apply {
+                data = Uri.fromParts("package", app.packageName, null)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+        )
     }
 
     private fun startSafely(intent: Intent) {
         try {
             startActivity(intent)
         } catch (_: ActivityNotFoundException) {
-            // Target app has no such activity; ignore.
+            // Target has no such activity; ignore.
         }
     }
 
@@ -131,5 +222,9 @@ class MainActivity : Activity() {
             search.setText("")
         }
         // Otherwise swallow the event so we stay on the home screen.
+    }
+
+    companion object {
+        private const val SWIPE_MIN = 100f
     }
 }
