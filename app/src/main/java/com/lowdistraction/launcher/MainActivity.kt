@@ -240,7 +240,7 @@ class MainActivity : Activity() {
             .setMultiChoiceItems(labels, checked) { _, which, isChecked ->
                 checked[which] = isChecked
             }
-            .setPositiveButton(android.R.string.ok) { _ ->
+            .setPositiveButton(android.R.string.ok) { _, _ ->
                 val chosen = apps.filterIndexed { index, _ -> checked[index] }
                     .take(BubblePrefs.MAX)
                     .map { it.component.flattenToString() }
