@@ -198,7 +198,7 @@ class RadialMenuView(
         }
         if (index != lastSlotIndex) {
             lastSlotIndex = index
-            val volume = (abs(spinVelocity) / 1200f).coerceIn(0.18f, 0.6f)
+            val volume = (abs(spinVelocity) / 1400f).coerceIn(0.12f, 0.45f)
             soundPool.play(chimeId, volume, volume, 1, 0, 1f)
         }
     }
@@ -253,7 +253,8 @@ class RadialMenuView(
                     val now = SystemClock.uptimeMillis()
                     val dt = (now - lastMoveTime) / 1000f
                     if (dt > 0.001f) {
-                        spinVelocity = spinVelocity * 0.6f + (delta / dt) * 0.4f
+                        spinVelocity = (spinVelocity * 0.6f + (delta / dt) * 0.4f)
+                            .coerceIn(-2200f, 2200f)
                         lastMoveTime = now
                     }
                     updateSlots()
@@ -300,10 +301,11 @@ class RadialMenuView(
             lastFrame = now
 
             angleOffset += spinVelocity * dt
-            spinVelocity *= Math.pow(0.12, dt.toDouble()).toFloat()
+            // 0.35/s decay -> the wheel glides noticeably longer before settling.
+            spinVelocity *= Math.pow(0.35, dt.toDouble()).toFloat()
             updateSlots()
 
-            if (abs(spinVelocity) > 12f) {
+            if (abs(spinVelocity) > 6f) {
                 postOnAnimation(this)
             } else {
                 spinVelocity = 0f
