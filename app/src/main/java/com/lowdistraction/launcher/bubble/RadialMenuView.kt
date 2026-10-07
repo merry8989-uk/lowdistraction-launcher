@@ -1,6 +1,8 @@
 package com.lowdistraction.launcher.bubble
 
 import android.content.Context
+import android.media.AudioAttributes
+import android.media.SoundPool
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -9,6 +11,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.TextView
 import com.lowdistraction.launcher.AppInfo
 import com.lowdistraction.launcher.R
@@ -20,12 +23,12 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /**
- * The radial menu shown beside the bubble — now a **spin wheel**.
+ * The menu shown on a long-press of the bubble.
  *
- * The apps sit on a ring around the three nested circles. Drag anywhere on the
- * ring to rotate it; let go and it keeps spinning with momentum and slows to a
- * stop (fidget-spinner style). A plain tap on a slot launches that app, and a
- * long-press on a slot removes it from the ring.
+ *  - A **spin wheel** of pinned apps (drag to rotate, momentum, tap to launch,
+ *    long-press a slot to remove). A soft chime plays as slots pass by, so the
+ *    wheel sounds calm while it turns.
+ *  - A row of **four quick actions** along the bottom: Torch, Volume, DND, Break.
  */
 class RadialMenuView(
     context: Context,
@@ -37,17 +40,18 @@ class RadialMenuView(
     private val onApp: (AppInfo) -> Unit,
     private val onRemoveApp: (AppInfo) -> Unit,
     private val onAddApps: () -> Unit,
-    private val onRing: (NestedCircleView.Ring) -> Unit,
+    private val onQuickAction: (QuickAction) -> Unit,
     private val onDismiss: () -> Unit
 ) : FrameLayout(context) {
+
+    enum class QuickAction { TORCH, VOLUME, DND, BREAK }
 
     private class Slot(val view: View, val app: AppInfo?, val baseAngle: Float)
 
     private val density = resources.displayMetrics.density
     private fun dp(value: Int) = (value * density).roundToInt()
 
-    private val ringRadius = dp(140).toFloat()
-    private val centerSize = dp(120)
+    private val ringRadius = dp(128).toFloat()
     private val slotSize = dp(56)
 
     private val centerX: Float
@@ -57,6 +61,7 @@ class RadialMenuView(
     private var angleOffset = 0f
     private var spinVelocity = 0f
     private var lastFrame = 0L
+    private var lastSlotIndex = -1
 
     private var dragging = false
     private var moved = false
@@ -77,22 +82,29 @@ class RadialMenuView(
         }
     }
 
+    private val soundPool: SoundPool = SoundPool.Builder()
+        .setMaxStreams(4)
+        .setAudioAttributes(
+            AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+        )
+        .build()
+    private var chimeId = 0
+
     init {
         setBackgroundColor(0x99000000.toInt())
+        chimeId = soundPool.load(context, R.raw.wheel_chime, 1)
+
         val margin = (ringRadius + slotSize / 2f + dp(8)).toInt()
+        val bottomReserve = dp(110)
         centerX = anchorX.coerceIn(margin, maxOf(margin, screenW - margin)).toFloat()
-        centerY = anchorY.coerceIn(margin, maxOf(margin, screenH - margin)).toFloat()
+        centerY = anchorY.coerceIn(margin, maxOf(margin, screenH - margin - bottomReserve)).toFloat()
         build()
     }
 
     private fun build() {
-        // Centre: the three nested circles (Back / Home / Lock).
-        val center = NestedCircleView(context).apply { onRingTap = { onRing(it) } }
-        addView(center, LayoutParams(centerSize, centerSize).apply {
-            leftMargin = (centerX - centerSize / 2f).roundToInt()
-            topMargin = (centerY - centerSize / 2f).roundToInt()
-        })
-
         val pinned = apps.take(BubblePrefs.MAX)
         val total = pinned.size + 1 // the extra slot is the "+" add button
         for (i in 0 until total) {
@@ -125,6 +137,41 @@ class RadialMenuView(
             slots.add(Slot(view, app, baseAngle))
         }
         updateSlots()
+        addBottomBar()
+    }
+
+    private fun addBottomBar() {
+        val bar = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+        val items = listOf(
+            R.string.qs_torch to QuickAction.TORCH,
+            R.string.qs_volume to QuickAction.VOLUME,
+            R.string.qs_dnd to QuickAction.DND,
+            R.string.qs_break to QuickAction.BREAK
+        )
+        for ((labelRes, action) in items) {
+            val chip = TextView(context).apply {
+                text = context.getString(labelRes)
+                setTextColor(0xFFEDEDED.toInt())
+                textSize = 13f
+                gravity = Gravity.CENTER
+                setBackgroundResource(R.drawable.bg_chip)
+                setPadding(dp(10), dp(14), dp(10), dp(14))
+                isClickable = true
+                setOnClickListener { onQuickAction(action) }
+            }
+            bar.addView(chip, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                setMargins(dp(4), 0, dp(4), 0)
+            })
+        }
+        addView(bar, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
+            gravity = Gravity.BOTTOM
+            leftMargin = dp(14)
+            rightMargin = dp(14)
+            bottomMargin = dp(56)
+        })
     }
 
     private fun updateSlots() {
@@ -134,6 +181,25 @@ class RadialMenuView(
             val sy = centerY + (ringRadius * sin(a)).toFloat()
             slot.view.x = sx - slotSize / 2f
             slot.view.y = sy - slotSize / 2f
+        }
+        maybeChime()
+    }
+
+    /** Plays a soft chime each time a slot passes the top, so the wheel sounds calm. */
+    private fun maybeChime() {
+        val total = slots.size
+        if (total <= 0 || chimeId == 0) return
+        val step = 360f / total
+        val normalised = ((angleOffset % 360f) + 360f) % 360f
+        val index = (normalised / step).toInt()
+        if (lastSlotIndex == -1) {
+            lastSlotIndex = index
+            return
+        }
+        if (index != lastSlotIndex) {
+            lastSlotIndex = index
+            val volume = (abs(spinVelocity) / 1200f).coerceIn(0.18f, 0.6f)
+            soundPool.play(chimeId, volume, volume, 1, 0, 1f)
         }
     }
 
@@ -255,5 +321,12 @@ class RadialMenuView(
         removeCallbacks(spinTick)
         spinVelocity = 0f
         lastFrame = 0L
+    }
+
+    override fun onDetachedFromWindow() {
+        removeCallbacks(spinTick)
+        handler.removeCallbacksAndMessages(null)
+        soundPool.release()
+        super.onDetachedFromWindow()
     }
 }

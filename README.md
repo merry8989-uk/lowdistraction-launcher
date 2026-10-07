@@ -161,13 +161,12 @@ No local toolchain needed for either.
 
 A floating, draggable bubble (like iOS AssistiveTouch) with three overlays:
 
-- **Single / double tap** → radial menu, which is a **spin wheel**: drag the
-  ring to rotate it and it keeps spinning with momentum before settling. The
-  centre is three concentric circles: **inner** = one step back, **middle** =
-  go home, **outer** = lock/sleep the screen. Around it sit up to 8 pinned apps
-  plus a **+** slot to add more (long-press a slot to remove it).
-- **Long press** → device-shortcuts panel: Torch, Sound, Brightness, Focus
-  mode, DND, Bedtime mode, Tea mode.
+- **Bubble taps:** 1 tap = Back, 2 taps = Home, 3 taps = Lock/sleep.
+- **Long press** the bubble → the menu: a **spin wheel** of up to 8 pinned apps
+  (drag to rotate, it keeps spinning with momentum and plays a soft chime as it
+  turns; tap a slot to launch, long-press a slot to remove) plus a **+** slot to
+  add more. Along the bottom sit four quick actions: **Torch, Volume, DND,
+  Break** (a 5-minute break screen).
 
 Turn it on from **Settings** (long-press anywhere on the home screen): there is
 a single switch to enable or disable the bubble.

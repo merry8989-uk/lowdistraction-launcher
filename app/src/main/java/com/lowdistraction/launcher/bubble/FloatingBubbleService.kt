@@ -9,15 +9,15 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
-import android.view.GestureDetector
+import android.os.Looper
+import android.os.SystemClock
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.ImageView
-import android.widget.LinearLayout
-import android.widget.TextView
 import androidx.core.app.NotificationCompat
 import com.lowdistraction.launcher.AppInfo
 import com.lowdistraction.launcher.AppRepository
@@ -27,11 +27,13 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
- * Draws the draggable assistive-touch bubble and owns the menu / panel overlays.
+ * Draws the draggable assistive-touch bubble.
  *
- *  - single tap  -> open the radial menu (8 app slots + nested circles)
- *  - double tap  -> same radial menu (quick access)
- *  - long press  -> device settings shortcuts panel
+ *  - 1 tap        -> Back
+ *  - 2 taps       -> Home
+ *  - 3 taps       -> Lock / sleep
+ *  - long press   -> the spin-wheel menu (apps + Torch / Volume / DND / Break)
+ *  - drag         -> move the bubble
  */
 class FloatingBubbleService : Service() {
 
@@ -39,9 +41,19 @@ class FloatingBubbleService : Service() {
     private var bubble: View? = null
     private var bubbleParams: WindowManager.LayoutParams? = null
     private var overlay: View? = null
-    private var panel: View? = null
 
     private val prefs by lazy { BubblePrefs(this) }
+    private val handler = Handler(Looper.getMainLooper())
+
+    private var tapCount = 0
+    private val tapAction = Runnable {
+        when (tapCount) {
+            1 -> AssistiveTouchService.back()
+            2 -> AssistiveTouchService.home()
+            else -> AssistiveTouchService.lock()
+        }
+        tapCount = 0
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -55,8 +67,8 @@ class FloatingBubbleService : Service() {
 
     override fun onDestroy() {
         running = false
+        handler.removeCallbacksAndMessages(null)
         removeOverlay()
-        removePanel()
         bubble?.let { runCatching { wm.removeView(it) } }
         bubble = null
         super.onDestroy()
@@ -83,45 +95,53 @@ class FloatingBubbleService : Service() {
             y = dp(240)
         }
 
-        val gesture = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
-            override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
-                toggleMenu()
-                return true
-            }
-
-            override fun onDoubleTap(e: MotionEvent): Boolean {
-                toggleMenu()
-                return true
-            }
-
-            override fun onLongPress(e: MotionEvent) {
-                togglePanel()
-            }
-        })
-
         var downRawX = 0f
         var downRawY = 0f
         var startX = 0
         var startY = 0
+        var downTime = 0L
+        var movedFar = false
+        var longFired = false
+
+        val longPress = Runnable {
+            longFired = true
+            toggleMenu()
+        }
 
         view.setOnTouchListener { v, ev ->
-            gesture.onTouchEvent(ev)
             when (ev.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     downRawX = ev.rawX
                     downRawY = ev.rawY
                     startX = params.x
                     startY = params.y
+                    downTime = SystemClock.uptimeMillis()
+                    movedFar = false
+                    longFired = false
+                    handler.postDelayed(longPress, LONG_PRESS_MS)
                 }
+
                 MotionEvent.ACTION_MOVE -> {
                     val dx = ev.rawX - downRawX
                     val dy = ev.rawY - downRawY
-                    if (abs(dx) > dp(6) || abs(dy) > dp(6)) {
+                    if (abs(dx) > dp(8) || abs(dy) > dp(8)) {
+                        movedFar = true
+                        handler.removeCallbacks(longPress)
                         params.x = startX + dx.toInt()
                         params.y = startY + dy.toInt()
                         runCatching { wm.updateViewLayout(v, params) }
                     }
                 }
+
+                MotionEvent.ACTION_UP -> {
+                    handler.removeCallbacks(longPress)
+                    val elapsed = SystemClock.uptimeMillis() - downTime
+                    if (!movedFar && !longFired && elapsed < TAP_MAX_MS) {
+                        registerTap()
+                    }
+                }
+
+                MotionEvent.ACTION_CANCEL -> handler.removeCallbacks(longPress)
             }
             true
         }
@@ -129,6 +149,18 @@ class FloatingBubbleService : Service() {
         bubble = view
         bubbleParams = params
         wm.addView(view, params)
+    }
+
+    /** Counts quick taps and fires Back / Home / Lock accordingly. */
+    private fun registerTap() {
+        tapCount++
+        handler.removeCallbacks(tapAction)
+        if (tapCount >= 3) {
+            AssistiveTouchService.lock()
+            tapCount = 0
+        } else {
+            handler.postDelayed(tapAction, TAP_WINDOW_MS)
+        }
     }
 
     // --------------------------------------------------------------- the menu
@@ -148,11 +180,12 @@ class FloatingBubbleService : Service() {
             onApp = { launch(it); removeOverlay() },
             onRemoveApp = { prefs.remove(it.component.flattenToString()); rebuildMenu() },
             onAddApps = { openAppPicker() },
-            onRing = { ring ->
-                when (ring) {
-                    NestedCircleView.Ring.INNER -> AssistiveTouchService.back()
-                    NestedCircleView.Ring.MIDDLE -> AssistiveTouchService.home()
-                    NestedCircleView.Ring.OUTER -> AssistiveTouchService.lock()
+            onQuickAction = { action ->
+                when (action) {
+                    RadialMenuView.QuickAction.TORCH -> QuickSettings.toggleTorch(this)
+                    RadialMenuView.QuickAction.VOLUME -> QuickSettings.openSound(this)
+                    RadialMenuView.QuickAction.DND -> QuickSettings.toggleDnd(this)
+                    RadialMenuView.QuickAction.BREAK -> startTeaMode()
                 }
                 removeOverlay()
             },
@@ -184,55 +217,6 @@ class FloatingBubbleService : Service() {
         )
     }
 
-    // -------------------------------------------------------------- the panel
-    private fun togglePanel() {
-        if (panel != null) {
-            removePanel()
-            return
-        }
-
-        val items: List<Pair<String, () -> Unit>> = listOf(
-            getString(R.string.qs_torch) to { QuickSettings.toggleTorch(this) },
-            getString(R.string.qs_sound) to { QuickSettings.openSound(this) },
-            getString(R.string.qs_brightness) to { QuickSettings.cycleBrightness(this) },
-            getString(R.string.qs_focus) to { QuickSettings.openFocusMode(this) },
-            getString(R.string.qs_dnd) to { QuickSettings.toggleDnd(this) },
-            getString(R.string.qs_bedtime) to { QuickSettings.openBedtimeMode(this) },
-            getString(R.string.qs_tea) to { startTeaMode() }
-        )
-
-        val column = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundResource(R.drawable.bg_panel)
-            val p = dp(6)
-            setPadding(p, p, p, p)
-        }
-        items.forEach { (label, action) ->
-            column.addView(TextView(this).apply {
-                text = label
-                setTextColor(0xFFEDEDED.toInt())
-                textSize = 15f
-                setPadding(dp(16), dp(12), dp(16), dp(12))
-                isClickable = true
-                setOnClickListener { action(); removePanel() }
-            })
-        }
-
-        val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            overlayType(),
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.TOP or Gravity.START
-            x = bubbleParams?.x ?: dp(12)
-            y = (bubbleParams?.y ?: dp(240)) + dp(64)
-        }
-        wm.addView(column, params)
-        panel = column
-    }
-
     private fun startTeaMode() {
         startActivity(
             Intent(this, TeaModeActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -257,11 +241,6 @@ class FloatingBubbleService : Service() {
     private fun removeOverlay() {
         overlay?.let { runCatching { wm.removeView(it) } }
         overlay = null
-    }
-
-    private fun removePanel() {
-        panel?.let { runCatching { wm.removeView(it) } }
-        panel = null
     }
 
     @Suppress("DEPRECATION")
@@ -317,6 +296,9 @@ class FloatingBubbleService : Service() {
 
         private const val NOTIF_ID = 4211
         private const val CHANNEL_ID = "assistive_bubble"
+        private const val LONG_PRESS_MS = 500L
+        private const val TAP_MAX_MS = 300L
+        private const val TAP_WINDOW_MS = 450L
 
         fun start(context: Context) {
             val intent = Intent(context, FloatingBubbleService::class.java)
