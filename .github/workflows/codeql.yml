@@ -24,11 +24,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # build-mode: none -> analyse the Kotlin/Java source WITHOUT compiling,
-          # so it does not need the Android SDK.
+          # Java/Kotlin has no usable "none" build mode, so we do a real build
+          # (Android SDK + gradlew) and let CodeQL trace it.
           - language: java-kotlin
-            build-mode: none
-          # Also scan the GitHub Actions workflows themselves.
+            build-mode: manual
+          # The Actions workflows themselves need no build.
           - language: actions
             build-mode: none
     steps:
@@ -41,11 +41,23 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Set up Android SDK
+        if: matrix.language == 'java-kotlin'
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
+
+      - name: Build for CodeQL
+        if: matrix.language == 'java-kotlin'
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleDebug --no-daemon
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@v3
