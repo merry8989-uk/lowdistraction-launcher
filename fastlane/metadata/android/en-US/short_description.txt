@@ -1,0 +1,1 @@
+A minimal text-only Android launcher. No icons, no trackers.

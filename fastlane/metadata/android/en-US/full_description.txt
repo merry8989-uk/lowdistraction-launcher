@@ -1,0 +1,26 @@
+Low Distraction is a minimal, text-only Android home screen.
+
+Instead of a grid of icons you get a quiet list of app names, the time and
+date, and a search box. Type to filter; when only one app matches it opens by
+itself. Long-press an app for App info, Uninstall or Hide.
+
+There is also an optional assistive bubble: a draggable floating button that
+opens a spin-wheel ring of your favourite apps, three nested circles for
+Back / Home / Lock, and a long-press panel of device shortcuts (torch, sound,
+brightness, Do Not Disturb, tea mode and more).
+
+Privacy: the app declares no INTERNET permission at all, so it cannot make a
+network request — no analytics, no crash reporting, no trackers. Its only
+dependencies are AndroidX.
+
+Features:
+* Text-only, distraction-free app list
+* Search that opens the app automatically when the query narrows to one match
+* Clock and date header
+* Hidden apps
+* Optional assistive-touch bubble with a spinnable app ring
+* Gestures: swipe for dialer / camera
+* Long-press anywhere on the home screen to open Settings
+
+Low Distraction is free software, released under the AGPL-3.0 licence. No
+ads, no accounts, no tracking.

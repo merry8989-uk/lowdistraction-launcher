@@ -1,0 +1,7 @@
+First public release.
+
+* Text-only app list with search and auto-open on a unique match
+* Clock + date header, hidden apps, swipe gestures
+* Optional assistive-touch bubble: spinnable app ring, Back/Home/Lock circles,
+  and a device-shortcut panel (torch, sound, brightness, DND, tea mode)
+* Signed with a stable release key so updates install in place
