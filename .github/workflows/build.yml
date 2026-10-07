@@ -17,7 +17,7 @@ jobs:
           java-version: '17'
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
         with:
           # Do NOT include the legacy "tools" package: it was removed from the
           # SDK repository and makes sdkmanager exit 1. Pin only what we need.
