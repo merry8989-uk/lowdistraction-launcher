@@ -162,7 +162,7 @@ class MainActivity : Activity() {
                 tint(bgHue, 0.075f),
                 tint(bgHue + 28f, 0.045f)
             )
-            bgHandler.postOnAnimation(this)
+            bgHandler.postDelayed(this, BG_FRAME_MS)
         }
     }
 
@@ -438,5 +438,7 @@ class MainActivity : Activity() {
         private const val REQ_QUICK = 701
         /** Degrees per second for the background — a full cycle takes ~5 minutes. */
         private const val BG_HUE_SPEED = 1.2f
+        /** ~20fps is plenty for a colour change this slow. */
+        private const val BG_FRAME_MS = 50L
     }
 }

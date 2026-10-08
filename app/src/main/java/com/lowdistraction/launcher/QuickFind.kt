@@ -38,7 +38,7 @@ object QuickFind {
         Target("Security", "security lock screen", Settings.ACTION_SECURITY_SETTINGS),
         Target("Privacy", "privacy permissions", Settings.ACTION_PRIVACY_SETTINGS),
         Target("Accessibility", "accessibility", Settings.ACTION_ACCESSIBILITY_SETTINGS),
-        Target("Notifications", "notifications alerts", Settings.ACTION_NOTIFICATION_SETTINGS),
+        Target("Notifications", "notifications alerts", "android.settings.NOTIFICATION_SETTINGS"),
         Target("Language & input", "language keyboard input", Settings.ACTION_LOCALE_SETTINGS),
         Target("Date & time", "date time clock", Settings.ACTION_DATE_SETTINGS),
         Target("About phone", "about phone device info", Settings.ACTION_DEVICE_INFO_SETTINGS),
