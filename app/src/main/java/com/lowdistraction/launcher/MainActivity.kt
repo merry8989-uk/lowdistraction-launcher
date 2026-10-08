@@ -28,7 +28,9 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.lowdistraction.launcher.bubble.BubblePrefs
 import kotlin.math.abs
+import kotlin.math.cos
 import kotlin.math.roundToInt
+import kotlin.math.sin
 
 /**
  * The home screen.
@@ -60,6 +62,7 @@ class MainActivity : Activity() {
     // Slow background drift
     private var bgDrawable: GradientDrawable? = null
     private var bgHue = 205f
+    private var bgT = 0f
     private var lastBgFrame = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -140,11 +143,17 @@ class MainActivity : Activity() {
     private fun startBackgroundDrift() {
         if (bgDrawable == null) {
             val root = findViewById<View>(R.id.root)
-            bgDrawable = GradientDrawable(
-                GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(0xFF0B0B0C.toInt(), 0xFF0B0B0C.toInt())
-            )
-            root.background = bgDrawable
+            val gd = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                gradientType = GradientDrawable.RADIAL
+                gradientRadius = maxOf(
+                    resources.displayMetrics.widthPixels,
+                    resources.displayMetrics.heightPixels
+                ) * 1.15f
+                colors = intArrayOf(0xFF101418.toInt(), 0xFF0B0B0C.toInt())
+            }
+            root.background = gd
+            bgDrawable = gd
         }
         lastBgFrame = 0L
         bgHandler.post(bgTick)
@@ -158,23 +167,33 @@ class MainActivity : Activity() {
     private val bgTick = object : Runnable {
         override fun run() {
             val now = SystemClock.uptimeMillis()
-            val dt = if (lastBgFrame == 0L) 0.016f
-            else ((now - lastBgFrame) / 1000f).coerceAtMost(0.05f)
+            val dt = if (lastBgFrame == 0L) 0.08f
+            else ((now - lastBgFrame) / 1000f).coerceAtMost(0.3f)
             lastBgFrame = now
 
+            bgT += dt
             bgHue = (bgHue + BG_HUE_SPEED * dt) % 360f
-            bgDrawable?.colors = intArrayOf(
-                tint(bgHue, 0.075f),
-                tint(bgHue + 28f, 0.045f)
-            )
+
+            // A soft coloured glow wanders slowly across the screen while the hue
+            // itself drifts, so the gradient keeps rearranging itself without ever
+            // being obvious about it.
+            val cx = 0.5f + 0.34f * sin(bgT * 0.045f)
+            val cy = 0.5f + 0.30f * cos(bgT * 0.031f)
+            bgDrawable?.let { gd ->
+                gd.setGradientCenter(cx, cy)
+                gd.colors = intArrayOf(
+                    tint(bgHue, 0.32f),
+                    tint(bgHue + 34f, 0.05f)
+                )
+            }
             bgHandler.postDelayed(this, BG_FRAME_MS)
         }
     }
 
-    /** A very dark, softly tinted colour for the background gradient. */
+    /** A dark, softly tinted colour for the background gradient. */
     private fun tint(hue: Float, value: Float): Int {
         val h = ((hue % 360f) + 360f) % 360f
-        val rgb = Color.HSVToColor(floatArrayOf(h, 0.34f, value))
+        val rgb = Color.HSVToColor(floatArrayOf(h, 0.52f, value))
         return (0xFF shl 24) or (rgb and 0x00FFFFFF)
     }
 
@@ -459,8 +478,8 @@ class MainActivity : Activity() {
         private const val AUTO_OPEN_DELAY_MS = 350L
         private const val REQ_QUICK = 701
         /** Degrees per second for the background — a full cycle takes ~5 minutes. */
-        private const val BG_HUE_SPEED = 1.2f
-        /** ~20fps is plenty for a colour change this slow. */
-        private const val BG_FRAME_MS = 50L
+        private const val BG_HUE_SPEED = 1.6f
+        /** ~12fps is plenty for a glow that moves this slowly. */
+        private const val BG_FRAME_MS = 80L
     }
 }

@@ -1,0 +1,6 @@
+Drifting gradient background
+
+- The home screen now has a soft, moving gradient: a coloured glow wanders
+  slowly across the screen while the hue drifts, so the background keeps
+  rearranging itself without ever being obvious.
+- Still dark and calm, and still no internet access.
