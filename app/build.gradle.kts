@@ -69,9 +69,11 @@ dependencies {
 // Internet lockdown guard.
 //
 // The app must never be able to reach the network. The manifest declares the
-// INTERNET permission with tools:node="remove", which strips it from the
-// merged manifest. This task makes sure nobody ever quietly drops that guard:
-// the build fails if INTERNET appears in the manifest without it.
+// INTERNET permission with tools:node=remove, which strips it from the merged
+// manifest. This task makes sure nobody quietly drops that guard: the build
+// fails if INTERNET appears in the manifest without it.
+//
+// The regexes use [^>]* so they still match when the element spans lines.
 // ---------------------------------------------------------------------------
 tasks.register("checkNoInternet") {
     group = "verification"
@@ -79,16 +81,18 @@ tasks.register("checkNoInternet") {
     doLast {
         val manifest = file("src/main/AndroidManifest.xml")
         if (!manifest.exists()) return@doLast
-        manifest.readLines().forEachIndexed { index, line ->
-            if (line.contains("android.permission.INTERNET") &&
-                !line.contains("tools:node=\"remove\"")
-            ) {
-                throw GradleException(
-                    "AndroidManifest.xml line ${index + 1}: the INTERNET permission must never " +
-                        "be grantable. Keep it declared with tools:node=\"remove\" so it is " +
-                        "stripped from the merged manifest."
-                )
-            }
+        val text = manifest.readText()
+        val mentionsInternet = text.contains("android.permission.INTERNET")
+        val guarded =
+            Regex("""<uses-permission[^>]*android:name="android.permission.INTERNET"[^>]*tools:node="remove"[^>]*/?>""")
+                .containsMatchIn(text) ||
+                Regex("""<uses-permission[^>]*tools:node="remove"[^>]*android:name="android.permission.INTERNET"[^>]*/?>""")
+                    .containsMatchIn(text)
+        if (mentionsInternet && !guarded) {
+            throw GradleException(
+                "The INTERNET permission must never be grantable. Keep the tools:node=remove " +
+                    "guard on it in AndroidManifest.xml so it is stripped from the merged manifest."
+            )
         }
     }
 }
