@@ -36,7 +36,7 @@
     <string name="settings_row_contact">Ask for more features</string>
     <string name="settings_row_updates">Check for updates</string>
     <string name="settings_updates_desc">Version %1$s · opens the releases page in your browser</string>
-    <string name="updates_url" translatable="false">https://github.com/merry8989-uk/lowdistraction-launcher/releases/latest</string>
+    <string name="updates_url" translatable="false">https://github.com/merry8989-uk/lowdistraction-launcher/releases</string>
     <string name="settings_hint_long_press">Long-press anywhere on the home screen to open this.</string>
     <string name="contact_instagram">@osintgram_io</string>
     <string name="contact_instagram_url" translatable="false">https://instagram.com/osintgram_io</string>

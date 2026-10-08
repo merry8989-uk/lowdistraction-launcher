@@ -1,0 +1,6 @@
+Dev.Check window
+
+- Dev.Check now opens a full-screen, tabbed device-info window:
+  Dashboard, Hardware, System, Battery, Network, Apps, Camera and Sensors.
+- Tap the Dev.Check badge (above the right search bar) to open it, or pick a
+  Dev.Check entry in the right search to jump straight to that tab.

@@ -1,0 +1,9 @@
+Search, colour and fixes
+
+- Second (system) search bar: looks through device-settings shortcuts, contacts
+  and calendar events.
+- Very slow, drifting home-screen background colour.
+- Uninstall fixed (the app now declares REQUEST_DELETE_PACKAGES).
+- Bubble wheel: the "+" slot hides once all 8 apps are pinned.
+- Network access locked down: the INTERNET permission is stripped from the
+  merged manifest and the build fails if that guard is ever removed.

@@ -1,6 +1,6 @@
 name: Release APK
 
-# Push a tag like v1.0 to cut a release, or run it manually from the
+# Push a tag like v1.14 to cut a release, or run it manually from the
 # Actions tab and supply a tag name.
 on:
   push:
@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to create the release under (e.g. v1.7)'
+        description: 'Tag to create the release under (e.g. v1.14)'
         required: true
 
 permissions:
@@ -54,10 +54,28 @@ jobs:
           mkdir -p dist
           cp app/build/outputs/apk/release/app-release.apk dist/lowdistraction-${{ github.event.inputs.tag || github.ref_name }}.apk
 
+      # Use the Fastlane changelog for this versionCode as the release notes,
+      # so every release states exactly what changed.
+      - name: Read changelog
+        id: changelog
+        run: |
+          CODE=$(grep -oP 'versionCode\s*=\s*\K[0-9]+' app/build.gradle.kts | head -1)
+          FILE="fastlane/metadata/android/en-US/changelogs/${CODE}.txt"
+          if [ -f "$FILE" ]; then
+            {
+              echo 'body<<CHANGELOG_EOF'
+              cat "$FILE"
+              echo 'CHANGELOG_EOF'
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo 'body=' >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           name: ${{ github.event.inputs.tag || github.ref_name }}
-          generate_release_notes: true
+          body: ${{ steps.changelog.outputs.body }}
+          generate_release_notes: ${{ steps.changelog.outputs.body == '' }}
           files: dist/*.apk

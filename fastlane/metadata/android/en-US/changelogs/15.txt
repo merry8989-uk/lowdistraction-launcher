@@ -1,0 +1,7 @@
+Check for updates
+
+- New "Check for updates" row in Settings: it shows your current version and
+  opens the releases page in your browser, so you can see exactly what changed
+  in every version.
+- The app itself still has no internet access, so nothing is checked in the
+  background.

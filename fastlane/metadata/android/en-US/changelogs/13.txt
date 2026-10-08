@@ -1,0 +1,5 @@
+Dev.Check shortcuts
+
+- New optional Dev.Check toggle in Settings: when on, device-info shortcuts
+  appear in the right search bar and a small Dev.Check badge shows above it.
+- Off by default.
