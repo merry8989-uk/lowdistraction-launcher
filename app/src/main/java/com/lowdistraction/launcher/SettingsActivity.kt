@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.provider.Settings
 import android.view.View
 import android.widget.Switch
+import android.widget.TextView
 import android.widget.Toast
 import com.lowdistraction.launcher.bubble.AssistiveTouchService
 import com.lowdistraction.launcher.bubble.FloatingBubbleService
