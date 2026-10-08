@@ -39,6 +39,10 @@ of app names. Inspired by launchers like Olauncher.
   it is on, the right search also surfaces the same shortcuts, opening the
   matching tab (or the matching system screen for Hardware / Battery / Network /
   Display / Storage / Apps). Long-press the badge for Settings.
+- **Check for updates** lives in Settings. Because the app has no INTERNET
+  permission it cannot check by itself, so the row shows your current version
+  and opens the releases page in your browser (the browser has network access;
+  the app still does not).
 - Registers as a HOME app. On first launch it shows a **“Set as default
   launcher”** prompt (Android's own role dialog on Android 10+, Home settings
   on older versions); you can also trigger it any time from Settings →

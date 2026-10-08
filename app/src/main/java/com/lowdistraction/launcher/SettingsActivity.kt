@@ -46,7 +46,29 @@ class SettingsActivity : Activity() {
         findViewById<View>(R.id.row_default).setOnClickListener { HomeRole.request(this) }
 
         findViewById<View>(R.id.row_contact).setOnClickListener { openInstagram() }
+
+        findViewById<View>(R.id.row_updates).setOnClickListener { openReleases() }
+        findViewById<TextView>(R.id.updatesDesc).text =
+            getString(R.string.settings_updates_desc, appVersion())
     }
+
+    /**
+     * The app has no INTERNET permission by design, so it cannot check for a new
+     * version itself. Instead we hand off to the browser, which shows the
+     * releases page (with the latest version) without weakening the lockdown.
+     */
+    private fun openReleases() {
+        val url = getString(R.string.updates_url)
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        } catch (_: Exception) {
+            Toast.makeText(this, url, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun appVersion(): String = runCatching {
+        packageManager.getPackageInfo(packageName, 0).versionName
+    }.getOrNull() ?: "—"
 
     override fun onResume() {
         super.onResume()
