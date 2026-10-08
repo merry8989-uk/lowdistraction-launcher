@@ -12,6 +12,12 @@ public issue for anything exploitable.
   reporting, no telemetry, no phoning home — it cannot, even in principle.
 - **No third-party SDKs.** The only dependencies are AndroidX
   (`core-ktx`, `recyclerview`).
+- **Permissions are minimal and explained.** No `INTERNET`, no location, no
+  camera, no storage. The app also declares `REQUEST_DELETE_PACKAGES` so the
+  Uninstall action can open the system dialog, and `READ_CONTACTS` /
+  `READ_CALENDAR` — those two are used only by the optional second search bar,
+  are asked for at runtime, and nothing is stored or sent anywhere (the app has
+  no network access at all).
 - **Only one component is exported.** `MainActivity` must be exported to work
   as a HOME app. Every service (`FloatingBubbleService`,
   `AssistiveTouchService`) and every other activity (`SettingsActivity`,

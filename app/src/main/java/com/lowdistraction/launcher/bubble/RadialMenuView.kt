@@ -117,7 +117,9 @@ class RadialMenuView(
 
     private fun build() {
         val pinned = apps.take(BubblePrefs.MAX)
-        val total = pinned.size + 1 // the extra slot is the "+" add button
+        // Show the "+" slot only while there is room for another app; once all
+        // 8 slots are full it disappears.
+        val total = if (pinned.size >= BubblePrefs.MAX) pinned.size else pinned.size + 1
         for (i in 0 until total) {
             val baseAngle = (360f / total) * i - 90f
             val view: View

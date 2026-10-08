@@ -25,6 +25,13 @@ of app names. Inspired by launchers like Olauncher.
 - **Settings:** long-press anywhere on the home screen (empty space, clock or
   background) to open Settings — the assistive-bubble on/off switch, ring apps,
   hidden apps, and a contact link all live there.
+- **Two search bars.** The left one filters apps (with auto-open on a unique
+  match). The right one is a system search: it looks through device-settings
+  shortcuts, contacts and calendar events, and falls back to the device's own
+  search. (Contacts/calendar need the runtime permissions, asked the first time
+  you tap into that field.)
+- **Slowly drifting background.** The home screen's colour shifts through soft
+  dark tints so gradually you barely notice it changing.
 - Registers as a HOME app. On first launch it shows a **“Set as default
   launcher”** prompt (Android's own role dialog on Android 10+, Home settings
   on older versions); you can also trigger it any time from Settings →

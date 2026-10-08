@@ -1,9 +1,12 @@
 <resources>
     <string name="app_name">Low Distraction</string>
-    <string name="search_hint">Search apps</string>
+    <string name="search_hint">Apps</string>
+    <string name="quickfind_hint">Settings, contacts…</string>
+    <string name="quickfind_none">Nothing found</string>
     <string name="no_apps">No apps found</string>
     <string name="action_app_info">App info</string>
     <string name="action_uninstall">Uninstall</string>
+    <string name="uninstall_unavailable">Couldn\'t open the uninstall dialog</string>
     <string name="action_hide">Hide app</string>
     <string name="hidden_apps">Hidden apps</string>
     <string name="no_hidden_apps">No hidden apps</string>

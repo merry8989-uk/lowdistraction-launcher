@@ -1,13 +1,18 @@
 package com.lowdistraction.launcher
 
+import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.provider.MediaStore
 import android.provider.Settings
 import android.text.Editable
@@ -23,33 +28,38 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.lowdistraction.launcher.bubble.BubblePrefs
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /**
- * The home screen: clock + date, a search box, and a text-only app list.
+ * The home screen.
  *
- * Search behaviour:
- *  - When a query narrows the list down to exactly ONE app, that app opens
- *    automatically after a short pause (AUTO_OPEN_DELAY_MS). Keep typing and
- *    the pending open is cancelled.
- *  - Pressing Enter/Search on the keyboard opens the top match.
- *
- * Gestures:
- *  - swipe right anywhere in the list  -> dialer
- *  - swipe left  anywhere in the list  -> camera
- *  - long-press ANYWHERE (empty space, clock, background) -> Settings
- *  - long-press an app                 -> app info / uninstall / hide
+ *  - Left search bar  -> filters the app list (auto-opens on a unique match).
+ *  - Right search bar -> looks through device settings, contacts and calendar,
+ *    and can hand the query to the device's own search.
+ *  - Long-press anywhere -> Settings.
+ *  - The background drifts through colour so slowly you barely notice.
  */
 class MainActivity : Activity() {
 
-    private lateinit var adapter: AppListAdapter
+    private lateinit var appAdapter: AppListAdapter
+    private lateinit var quickAdapter: QuickFindAdapter
+    private lateinit var list: RecyclerView
     private lateinit var emptyView: TextView
     private lateinit var search: EditText
+    private lateinit var quickFind: EditText
     private lateinit var hiddenApps: HiddenApps
 
     private var allApps: List<AppInfo> = emptyList()
     private var currentResults: List<AppInfo> = emptyList()
 
     private val autoOpenHandler = Handler(Looper.getMainLooper())
+    private val quickHandler = Handler(Looper.getMainLooper())
+    private var quickToken = 0
+
+    // Slow background drift
+    private var bgDrawable: GradientDrawable? = null
+    private var bgHue = 205f
+    private var lastBgFrame = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,15 +68,17 @@ class MainActivity : Activity() {
         hiddenApps = HiddenApps(this)
         emptyView = findViewById(R.id.empty)
         search = findViewById(R.id.search)
+        quickFind = findViewById(R.id.quickFind)
+        list = findViewById(R.id.appList)
 
-        adapter = AppListAdapter(
+        appAdapter = AppListAdapter(
             onLaunch = { launch(it) },
             onLongPress = { app, view -> showAppMenu(app, view) }
         )
+        quickAdapter = QuickFindAdapter { entry -> openQuick(entry) }
 
-        val list = findViewById<RecyclerView>(R.id.appList)
         list.layoutManager = LinearLayoutManager(this)
-        list.adapter = adapter
+        list.adapter = appAdapter
         setupGestures(list)
 
         // Long-press anywhere on the home screen opens Settings.
@@ -76,17 +88,26 @@ class MainActivity : Activity() {
         search.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-            override fun afterTextChanged(s: Editable?) = filter(s?.toString().orEmpty())
+            override fun afterTextChanged(s: Editable?) {
+                if (quickFind.text.isNullOrEmpty()) filter(s?.toString().orEmpty())
+            }
         })
-
         search.setOnEditorActionListener { _, actionId, _ -> handleSearchAction(actionId) }
 
-        maybePromptDefaultLauncher()
+        quickFind.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) = updateQuick(s?.toString().orEmpty())
+        })
+        quickFind.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) requestQuickPermissions()
+        }
 
         if (intent?.getBooleanExtra(EXTRA_PICK_APPS, false) == true) {
             showAppPicker()
         }
 
+        maybePromptDefaultLauncher()
         loadApps()
     }
 
@@ -99,51 +120,74 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        // Reload so newly installed / removed apps show up without a restart.
         if (allApps.isNotEmpty()) loadApps()
+        startBackgroundDrift()
     }
 
     override fun onPause() {
         super.onPause()
-        // Never fire a queued auto-open while we are in the background.
         autoOpenHandler.removeCallbacksAndMessages(null)
+        quickHandler.removeCallbacksAndMessages(null)
+        stopBackgroundDrift()
     }
 
-    /**
-     * On the first launch, if we are not already the home app, ask the user to
-     * set us as the default launcher. Shown only once.
-     */
-    private fun maybePromptDefaultLauncher() {
-        val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
-        if (prefs.getBoolean(KEY_PROMPT_SHOWN, false)) return
-        if (HomeRole.isDefault(this)) return
-        prefs.edit().putBoolean(KEY_PROMPT_SHOWN, true).apply()
-
-        AlertDialog.Builder(this)
-            .setTitle(R.string.set_default_title)
-            .setMessage(R.string.set_default_message)
-            .setPositiveButton(R.string.set_default_ok) { _, _ -> HomeRole.request(this) }
-            .setNegativeButton(R.string.set_default_later, null)
-            .show()
+    // ------------------------------------------------ slow background drift
+    private fun startBackgroundDrift() {
+        if (bgDrawable == null) {
+            val root = findViewById<View>(R.id.root)
+            bgDrawable = GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(0xFF0B0B0C.toInt(), 0xFF0B0B0C.toInt())
+            )
+            root.background = bgDrawable
+        }
+        lastBgFrame = 0L
+        bgHandler.post(bgTick)
     }
 
-    private fun openSettings() {
-        startActivity(Intent(this, SettingsActivity::class.java))
+    private fun stopBackgroundDrift() {
+        bgHandler.removeCallbacks(bgTick)
     }
 
+    private val bgHandler = Handler(Looper.getMainLooper())
+    private val bgTick = object : Runnable {
+        override fun run() {
+            val now = SystemClock.uptimeMillis()
+            val dt = if (lastBgFrame == 0L) 0.016f
+            else ((now - lastBgFrame) / 1000f).coerceAtMost(0.05f)
+            lastBgFrame = now
+
+            bgHue = (bgHue + BG_HUE_SPEED * dt) % 360f
+            bgDrawable?.colors = intArrayOf(
+                tint(bgHue, 0.075f),
+                tint(bgHue + 28f, 0.045f)
+            )
+            bgHandler.postOnAnimation(this)
+        }
+    }
+
+    /** A very dark, softly tinted colour for the background gradient. */
+    private fun tint(hue: Float, value: Float): Int {
+        val h = ((hue % 360f) + 360f) % 360f
+        val rgb = Color.HSVToColor(floatArrayOf(h, 0.34f, value))
+        return (0xFF shl 24) or (rgb and 0x00FFFFFF)
+    }
+
+    // ----------------------------------------------------------- app search
     private fun loadApps() {
         Thread {
             val apps = AppRepository.loadApps(this)
             runOnUiThread {
                 allApps = apps
-                filter(search.text?.toString().orEmpty())
+                if (quickFind.text.isNullOrEmpty()) filter(search.text?.toString().orEmpty())
             }
         }.start()
     }
 
     private fun filter(query: String) {
-        // Any change to the query cancels a pending auto-open.
         autoOpenHandler.removeCallbacksAndMessages(null)
+        list.adapter = appAdapter
+        emptyView.text = getString(R.string.no_apps)
 
         val q = query.trim().lowercase()
         val visible = allApps.filter { !hiddenApps.isHidden(it.packageName) }
@@ -154,10 +198,9 @@ class MainActivity : Activity() {
         }
 
         currentResults = filtered
-        adapter.submit(filtered)
+        appAdapter.submit(filtered)
         emptyView.visibility = if (filtered.isEmpty()) View.VISIBLE else View.GONE
 
-        // Auto-open the app once the query has narrowed down to exactly one.
         if (q.isNotEmpty() && filtered.size == 1) {
             val target = filtered.first()
             autoOpenHandler.postDelayed({ launch(target) }, AUTO_OPEN_DELAY_MS)
@@ -186,6 +229,77 @@ class MainActivity : Activity() {
         }
         startSafely(intent)
         search.setText("")
+    }
+
+    // ----------------------------------------------------------- quick find
+    private fun updateQuick(query: String) {
+        if (query.isEmpty()) {
+            filter(search.text?.toString().orEmpty())
+            return
+        }
+        autoOpenHandler.removeCallbacksAndMessages(null)
+        list.adapter = quickAdapter
+        emptyView.text = getString(R.string.quickfind_none)
+
+        val token = ++quickToken
+        val q = query
+        Thread {
+            val results = QuickFind.search(this, q)
+            runOnUiThread {
+                if (token != quickToken) return@runOnUiThread
+                quickAdapter.submit(results)
+                emptyView.visibility = if (results.isEmpty()) View.VISIBLE else View.GONE
+            }
+        }.start()
+    }
+
+    private fun openQuick(entry: QuickEntry) {
+        quickFind.setText("")
+        startSafely(entry.intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+
+    private fun requestQuickPermissions() {
+        val missing = ArrayList<String>()
+        if (checkSelfPermission(Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+            missing.add(Manifest.permission.READ_CONTACTS)
+        }
+        if (checkSelfPermission(Manifest.permission.READ_CALENDAR) != PackageManager.PERMISSION_GRANTED) {
+            missing.add(Manifest.permission.READ_CALENDAR)
+        }
+        if (missing.isNotEmpty()) {
+            requestPermissions(missing.toTypedArray(), REQ_QUICK)
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQ_QUICK) {
+            val q = quickFind.text?.toString().orEmpty()
+            if (q.isNotEmpty()) updateQuick(q)
+        }
+    }
+
+    // --------------------------------------------------------- long-press menu
+    private fun openSettings() {
+        startActivity(Intent(this, SettingsActivity::class.java))
+    }
+
+    private fun maybePromptDefaultLauncher() {
+        val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
+        if (prefs.getBoolean(KEY_PROMPT_SHOWN, false)) return
+        if (HomeRole.isDefault(this)) return
+        prefs.edit().putBoolean(KEY_PROMPT_SHOWN, true).apply()
+
+        AlertDialog.Builder(this)
+            .setTitle(R.string.set_default_title)
+            .setMessage(R.string.set_default_message)
+            .setPositiveButton(R.string.set_default_ok) { _, _ -> HomeRole.request(this) }
+            .setNegativeButton(R.string.set_default_later, null)
+            .show()
     }
 
     private fun showAppMenu(app: AppInfo, anchor: View) {
@@ -251,16 +365,12 @@ class MainActivity : Activity() {
             }
 
             override fun onLongPress(e: MotionEvent) {
-                // Only when the press is NOT on an app row (that opens the app
-                // menu instead).
                 if (list.findChildViewUnder(e.x, e.y) == null) {
                     openSettings()
                 }
             }
         })
 
-        // addOnItemTouchListener sees every event before the rows consume it,
-        // so swipes and long-presses work even over the list.
         list.addOnItemTouchListener(object : RecyclerView.SimpleOnItemTouchListener() {
             override fun onInterceptTouchEvent(rv: RecyclerView, e: MotionEvent): Boolean {
                 detector.onTouchEvent(e)
@@ -291,28 +401,32 @@ class MainActivity : Activity() {
     }
 
     private fun uninstall(app: AppInfo) {
-        startSafely(
-            Intent(Intent.ACTION_DELETE).apply {
-                data = Uri.fromParts("package", app.packageName, null)
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            }
-        )
+        val intent = Intent(Intent.ACTION_DELETE).apply {
+            data = Uri.parse("package:${app.packageName}")
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        if (packageManager.resolveActivity(intent, 0) == null) {
+            Toast.makeText(this, R.string.uninstall_unavailable, Toast.LENGTH_SHORT).show()
+            return
+        }
+        startSafely(intent)
     }
 
     private fun startSafely(intent: Intent) {
         try {
             startActivity(intent)
         } catch (_: ActivityNotFoundException) {
-            // Target has no such activity; ignore.
+            Toast.makeText(this, R.string.uninstall_unavailable, Toast.LENGTH_SHORT).show()
         }
     }
 
     @Deprecated("Launcher home; back should not exit the app list")
     override fun onBackPressed() {
-        if (search.text.isNotEmpty()) {
+        if (quickFind.text.isNotEmpty()) {
+            quickFind.setText("")
+        } else if (search.text.isNotEmpty()) {
             search.setText("")
         }
-        // Otherwise swallow the event so we stay on the home screen.
     }
 
     companion object {
@@ -321,5 +435,8 @@ class MainActivity : Activity() {
         private const val KEY_PROMPT_SHOWN = "default_prompt_shown"
         private const val SWIPE_MIN = 100f
         private const val AUTO_OPEN_DELAY_MS = 350L
+        private const val REQ_QUICK = 701
+        /** Degrees per second for the background — a full cycle takes ~5 minutes. */
+        private const val BG_HUE_SPEED = 1.2f
     }
 }
