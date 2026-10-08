@@ -32,6 +32,11 @@ of app names. Inspired by launchers like Olauncher.
   you tap into that field.)
 - **Slowly drifting background.** The home screen's colour shifts through soft
   dark tints so gradually you barely notice it changing.
+- **Dev.Check shortcuts (optional, off by default).** Turn it on in Settings and
+  a small **Dev.Check** badge appears above the right search bar (tap it to open
+  the setting). While it is on, the right search also surfaces device-info
+  shortcuts — Dashboard, System, Sensors, Camera, Hardware, Battery, Network,
+  Display, Storage, Apps — which open the matching in-app info or system screen.
 - Registers as a HOME app. On first launch it shows a **“Set as default
   launcher”** prompt (Android's own role dialog on Android 10+, Home settings
   on older versions); you can also trigger it any time from Settings →

@@ -14,7 +14,13 @@ import java.util.Date
 import java.util.Locale
 
 /** One result row in the second (system) search bar. */
-data class QuickEntry(val label: String, val hint: String, val intent: Intent)
+data class QuickEntry(
+    val label: String,
+    val hint: String,
+    val intent: Intent? = null,
+    /** When set, the action is handled inside the app (see DevCheck). */
+    val id: String? = null
+)
 
 /**
  * Backs the second search bar: it looks through device settings shortcuts,
@@ -46,7 +52,7 @@ object QuickFind {
         Target("All settings", "settings all", Settings.ACTION_SETTINGS)
     )
 
-    fun search(context: Context, query: String): List<QuickEntry> {
+    fun search(context: Context, query: String, includeDevCheck: Boolean = false): List<QuickEntry> {
         val q = query.trim()
         if (q.isEmpty()) return emptyList()
 
@@ -54,6 +60,9 @@ object QuickFind {
         out += contactEntries(context, q)
         out += calendarEntries(context, q)
         out += settingsEntries(q)
+        if (includeDevCheck) {
+            out += DevCheck.entries().filter { DevCheck.matches(it, q) }
+        }
 
         if (out.isEmpty()) {
             out.add(

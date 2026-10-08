@@ -47,6 +47,7 @@ class MainActivity : Activity() {
     private lateinit var emptyView: TextView
     private lateinit var search: EditText
     private lateinit var quickFind: EditText
+    private lateinit var devCheckBadge: View
     private lateinit var hiddenApps: HiddenApps
 
     private var allApps: List<AppInfo> = emptyList()
@@ -70,6 +71,8 @@ class MainActivity : Activity() {
         search = findViewById(R.id.search)
         quickFind = findViewById(R.id.quickFind)
         list = findViewById(R.id.appList)
+        devCheckBadge = findViewById(R.id.devCheckBadge)
+        devCheckBadge.setOnClickListener { openSettings() }
 
         appAdapter = AppListAdapter(
             onLaunch = { launch(it) },
@@ -122,6 +125,7 @@ class MainActivity : Activity() {
         super.onResume()
         if (allApps.isNotEmpty()) loadApps()
         startBackgroundDrift()
+        updateDevCheckBadge()
     }
 
     override fun onPause() {
@@ -244,7 +248,7 @@ class MainActivity : Activity() {
         val token = ++quickToken
         val q = query
         Thread {
-            val results = QuickFind.search(this, q)
+            val results = QuickFind.search(this, q, ShortcutPrefs.isDevCheckEnabled(this))
             runOnUiThread {
                 if (token != quickToken) return@runOnUiThread
                 quickAdapter.submit(results)
@@ -255,7 +259,20 @@ class MainActivity : Activity() {
 
     private fun openQuick(entry: QuickEntry) {
         quickFind.setText("")
-        startSafely(entry.intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        val id = entry.id
+        if (id != null) {
+            showDevCheck(id)
+            return
+        }
+        entry.intent?.let { startSafely(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+    }
+
+    private fun showDevCheck(id: String) {
+        AlertDialog.Builder(this)
+            .setTitle(DevCheck.title(id))
+            .setMessage(DevCheck.body(this, id))
+            .setPositiveButton(R.string.devcheck_close, null)
+            .show()
     }
 
     private fun requestQuickPermissions() {
@@ -286,6 +303,11 @@ class MainActivity : Activity() {
     // --------------------------------------------------------- long-press menu
     private fun openSettings() {
         startActivity(Intent(this, SettingsActivity::class.java))
+    }
+
+    private fun updateDevCheckBadge() {
+        devCheckBadge.visibility =
+            if (ShortcutPrefs.isDevCheckEnabled(this)) View.VISIBLE else View.GONE
     }
 
     private fun maybePromptDefaultLauncher() {

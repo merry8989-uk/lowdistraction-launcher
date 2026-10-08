@@ -57,6 +57,13 @@ class SettingsActivity : Activity() {
         toggle.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked) enableBubble() else disableBubble()
         }
+
+        val devCheck = findViewById<Switch>(R.id.devcheck_switch)
+        devCheck.setOnCheckedChangeListener(null)
+        devCheck.isChecked = ShortcutPrefs.isDevCheckEnabled(this)
+        devCheck.setOnCheckedChangeListener { _, isChecked ->
+            ShortcutPrefs.setDevCheckEnabled(this, isChecked)
+        }
     }
 
     private fun enableBubble() {

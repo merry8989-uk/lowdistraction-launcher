@@ -3,6 +3,10 @@
     <string name="search_hint">Apps</string>
     <string name="quickfind_hint">Settings, contacts…</string>
     <string name="quickfind_none">Nothing found</string>
+    <string name="devcheck_badge">Dev.Check</string>
+    <string name="settings_row_devcheck">Dev.Check shortcuts</string>
+    <string name="settings_devcheck_desc">Show device-info shortcuts in the right search bar</string>
+    <string name="devcheck_close">Close</string>
     <string name="no_apps">No apps found</string>
     <string name="action_app_info">App info</string>
     <string name="action_uninstall">Uninstall</string>
