@@ -72,7 +72,8 @@ class MainActivity : Activity() {
         quickFind = findViewById(R.id.quickFind)
         list = findViewById(R.id.appList)
         devCheckBadge = findViewById(R.id.devCheckBadge)
-        devCheckBadge.setOnClickListener { openSettings() }
+        devCheckBadge.setOnClickListener { openDevCheck(null) }
+        devCheckBadge.setOnLongClickListener { openSettings(); true }
 
         appAdapter = AppListAdapter(
             onLaunch = { launch(it) },
@@ -261,18 +262,17 @@ class MainActivity : Activity() {
         quickFind.setText("")
         val id = entry.id
         if (id != null) {
-            showDevCheck(id)
+            openDevCheck(DevCheck.tabFor(id))
             return
         }
         entry.intent?.let { startSafely(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
     }
 
-    private fun showDevCheck(id: String) {
-        AlertDialog.Builder(this)
-            .setTitle(DevCheck.title(id))
-            .setMessage(DevCheck.body(this, id))
-            .setPositiveButton(R.string.devcheck_close, null)
-            .show()
+    private fun openDevCheck(tab: String?) {
+        startActivity(
+            Intent(this, DevCheckActivity::class.java)
+                .putExtra(DevCheckActivity.EXTRA_TAB, tab)
+        )
     }
 
     private fun requestQuickPermissions() {

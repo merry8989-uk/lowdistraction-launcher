@@ -73,6 +73,12 @@
             android:theme="@style/Theme.LowDistraction" />
 
         <activity
+            android:name=".DevCheckActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.LowDistraction" />
+
+        <activity
             android:name=".bubble.TeaModeActivity"
             android:exported="false"
             android:excludeFromRecents="true"

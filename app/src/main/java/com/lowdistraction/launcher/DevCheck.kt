@@ -55,6 +55,14 @@ object DevCheck {
         }
     }
 
+    /** Which Dev.Check tab a shortcut should open. */
+    fun tabFor(id: String): String = when (id) {
+        ID_SYSTEM -> "System"
+        ID_SENSORS -> "Sensors"
+        ID_CAMERA -> "Camera"
+        else -> "Dashboard"
+    }
+
     fun title(id: String): String = when (id) {
         ID_DASHBOARD -> "Dev.Check · Dashboard"
         ID_SYSTEM -> "Dev.Check · System"

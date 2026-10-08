@@ -4,6 +4,9 @@
     <string name="quickfind_hint">Settings, contacts…</string>
     <string name="quickfind_none">Nothing found</string>
     <string name="devcheck_badge">Dev.Check</string>
+    <string name="devcheck_title">Dev.Check</string>
+    <string name="devcheck_back">←</string>
+    <string name="devcheck_settings">Settings</string>
     <string name="settings_row_devcheck">Dev.Check shortcuts</string>
     <string name="settings_devcheck_desc">Show device-info shortcuts in the right search bar</string>
     <string name="devcheck_close">Close</string>
