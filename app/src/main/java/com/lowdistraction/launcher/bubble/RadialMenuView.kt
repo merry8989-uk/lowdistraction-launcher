@@ -1,6 +1,8 @@
 package com.lowdistraction.launcher.bubble
 
 import android.content.Context
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.media.AudioAttributes
 import android.media.SoundPool
 import android.os.Handler
@@ -26,9 +28,11 @@ import kotlin.math.sin
  * The menu shown on a long-press of the bubble.
  *
  *  - A **spin wheel** of pinned apps (drag to rotate, momentum, tap to launch,
- *    long-press a slot to remove). A soft chime plays as slots pass by, so the
- *    wheel sounds calm while it turns.
+ *    long-press a slot to remove). A soft chime plays as slots pass by.
  *  - A row of **four quick actions** along the bottom: Torch, Volume, DND, Break.
+ *  - The whole wheel drifts through a slow, soft colour combination: the hue
+ *    rotates gently and each slot is offset from the next, so a calm gradient
+ *    keeps rearranging itself on its own.
  */
 class RadialMenuView(
     context: Context,
@@ -58,6 +62,9 @@ class RadialMenuView(
     private val centerY: Float
 
     private val slots = ArrayList<Slot>()
+    private val slotDrawables = ArrayList<GradientDrawable>()
+    private val chipDrawables = ArrayList<GradientDrawable>()
+
     private var angleOffset = 0f
     private var spinVelocity = 0f
     private var lastFrame = 0L
@@ -70,6 +77,10 @@ class RadialMenuView(
     private var downAngle = 0f
     private var downDist = 0f
     private var lastMoveTime = 0L
+
+    // Slow colour drift
+    private var baseHue = 150f
+    private var lastHueFrame = 0L
 
     private val handler = Handler(Looper.getMainLooper())
     private val longPressRunnable = Runnable {
@@ -111,10 +122,16 @@ class RadialMenuView(
             val baseAngle = (360f / total) * i - 90f
             val view: View
             val app: AppInfo?
+            val bg = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setStroke(dp(1), 0x669AE6B4.toInt())
+            }
+            slotDrawables.add(bg)
+
             if (i < pinned.size) {
                 app = pinned[i]
                 view = ImageView(context).apply {
-                    setBackgroundResource(R.drawable.bg_slot)
+                    background = bg
                     val pad = (slotSize * 0.22f).toInt()
                     setPadding(pad, pad, pad, pad)
                     try {
@@ -128,9 +145,9 @@ class RadialMenuView(
                 view = TextView(context).apply {
                     text = "+"
                     textSize = 24f
-                    setTextColor(0xFF9AE6B4.toInt())
+                    setTextColor(0xFFEDEDED.toInt())
                     gravity = Gravity.CENTER
-                    setBackgroundResource(R.drawable.bg_slot)
+                    background = bg
                 }
             }
             addView(view, LayoutParams(slotSize, slotSize))
@@ -138,6 +155,7 @@ class RadialMenuView(
         }
         updateSlots()
         addBottomBar()
+        applyPalette()
     }
 
     private fun addBottomBar() {
@@ -152,12 +170,17 @@ class RadialMenuView(
             R.string.qs_break to QuickAction.BREAK
         )
         for ((labelRes, action) in items) {
+            val bg = GradientDrawable().apply {
+                cornerRadius = dp(14).toFloat()
+                setStroke(dp(1), 0x669AE6B4.toInt())
+            }
+            chipDrawables.add(bg)
             val chip = TextView(context).apply {
                 text = context.getString(labelRes)
                 setTextColor(0xFFEDEDED.toInt())
                 textSize = 13f
                 gravity = Gravity.CENTER
-                setBackgroundResource(R.drawable.bg_chip)
+                background = bg
                 setPadding(dp(10), dp(14), dp(10), dp(14))
                 isClickable = true
                 setOnClickListener { onQuickAction(action) }
@@ -174,6 +197,43 @@ class RadialMenuView(
         })
     }
 
+    // ------------------------------------------------------- slow colour drift
+    private fun applyPalette() {
+        val n = slotDrawables.size
+        for (i in 0 until n) {
+            // Spread the hues evenly and let the whole set rotate slowly.
+            val hue = baseHue + i * (360f / maxOf(n, 1)) * 0.5f
+            slotDrawables[i].setColor(hsv(hue, 0.42f, 0.24f, 0.92f))
+            slotDrawables[i].setStroke(dp(1), hsv(hue, 0.55f, 0.95f, 1f))
+        }
+        for (i in chipDrawables.indices) {
+            val hue = baseHue + 40f + i * 34f
+            chipDrawables[i].setColor(hsv(hue, 0.40f, 0.26f, 0.92f))
+            chipDrawables[i].setStroke(dp(1), hsv(hue, 0.50f, 0.92f, 1f))
+        }
+    }
+
+    private fun hsv(hue: Float, sat: Float, value: Float, alpha: Float): Int {
+        val h = ((hue % 360f) + 360f) % 360f
+        val rgb = Color.HSVToColor(floatArrayOf(h, sat, value))
+        val a = (alpha * 255f).roundToInt().coerceIn(0, 255)
+        return (a shl 24) or (rgb and 0x00FFFFFF)
+    }
+
+    private val hueTick = object : Runnable {
+        override fun run() {
+            val now = SystemClock.uptimeMillis()
+            val dt = if (lastHueFrame == 0L) 0.016f
+            else ((now - lastHueFrame) / 1000f).coerceAtMost(0.05f)
+            lastHueFrame = now
+
+            baseHue = (baseHue + HUE_SPEED * dt) % 360f
+            applyPalette()
+            postOnAnimation(this)
+        }
+    }
+
+    // ------------------------------------------------------------- the wheel
     private fun updateSlots() {
         for (slot in slots) {
             val a = Math.toRadians((slot.baseAngle + angleOffset).toDouble())
@@ -325,10 +385,22 @@ class RadialMenuView(
         lastFrame = 0L
     }
 
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        lastHueFrame = 0L
+        postOnAnimation(hueTick)
+    }
+
     override fun onDetachedFromWindow() {
         removeCallbacks(spinTick)
+        removeCallbacks(hueTick)
         handler.removeCallbacksAndMessages(null)
         soundPool.release()
         super.onDetachedFromWindow()
+    }
+
+    private companion object {
+        /** Degrees per second — a full colour cycle takes ~36s. */
+        const val HUE_SPEED = 10f
     }
 }
