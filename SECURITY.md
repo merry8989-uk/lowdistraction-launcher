@@ -7,9 +7,13 @@ public issue for anything exploitable.
 
 ## Why the attack surface is small
 
-- **No `INTERNET` permission.** The app does not declare it, so it is
-  technically incapable of making any network request. No analytics, no crash
-  reporting, no telemetry, no phoning home — it cannot, even in principle.
+- **No `INTERNET` permission — enforced, not just omitted.** The app does not
+  declare it, so it is technically incapable of making any network request. On
+  top of that, the manifest declares the permission with `tools:node="remove"`,
+  which strips it from the merged manifest even if a dependency or a future edit
+  tries to add it — and a Gradle task (`checkNoInternet`) fails the build if that
+  guard is ever removed. No analytics, no crash reporting, no telemetry, no
+  phoning home — it cannot, even in principle.
 - **No third-party SDKs.** The only dependencies are AndroidX
   (`core-ktx`, `recyclerview`).
 - **Permissions are minimal and explained.** No `INTERNET`, no location, no

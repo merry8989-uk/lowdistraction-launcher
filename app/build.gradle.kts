@@ -64,3 +64,35 @@ dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.recyclerview:recyclerview:1.3.2")
 }
+
+// ---------------------------------------------------------------------------
+// Internet lockdown guard.
+//
+// The app must never be able to reach the network. The manifest declares the
+// INTERNET permission with tools:node="remove", which strips it from the
+// merged manifest. This task makes sure nobody ever quietly drops that guard:
+// the build fails if INTERNET appears in the manifest without it.
+// ---------------------------------------------------------------------------
+tasks.register("checkNoInternet") {
+    group = "verification"
+    description = "Fails the build if the INTERNET permission is not stripped."
+    doLast {
+        val manifest = file("src/main/AndroidManifest.xml")
+        if (!manifest.exists()) return@doLast
+        manifest.readLines().forEachIndexed { index, line ->
+            if (line.contains("android.permission.INTERNET") &&
+                !line.contains("tools:node=\"remove\"")
+            ) {
+                throw GradleException(
+                    "AndroidManifest.xml line ${index + 1}: the INTERNET permission must never " +
+                        "be grantable. Keep it declared with tools:node=\"remove\" so it is " +
+                        "stripped from the merged manifest."
+                )
+            }
+        }
+    }
+}
+
+tasks.matching { it.name == "preBuild" }.configureEach {
+    dependsOn("checkNoInternet")
+}

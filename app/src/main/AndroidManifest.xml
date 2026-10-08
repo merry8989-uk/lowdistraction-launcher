@@ -14,6 +14,14 @@
         </intent>
     </queries>
 
+    <!-- The app must NEVER be able to reach the network. Declaring INTERNET with
+         tools:node="remove" strips it from the merged manifest, so it stays gone
+         even if a dependency (or a future edit) tries to add it. The build also
+         fails if this guard is ever removed (see checkNoInternet in build.gradle.kts). -->
+    <uses-permission
+        android:name="android.permission.INTERNET"
+        tools:node="remove" />
+
     <!-- Assistive bubble -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
