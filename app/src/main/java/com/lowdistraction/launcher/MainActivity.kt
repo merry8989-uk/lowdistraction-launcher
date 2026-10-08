@@ -145,7 +145,7 @@ class MainActivity : Activity() {
             val root = findViewById<View>(R.id.root)
             val gd = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
-                gradientType = GradientDrawable.RADIAL
+                gradientType = GradientDrawable.RADIAL_GRADIENT
                 gradientRadius = maxOf(
                     resources.displayMetrics.widthPixels,
                     resources.displayMetrics.heightPixels
