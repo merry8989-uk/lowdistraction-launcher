@@ -26,6 +26,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.lowdistraction.launcher.bubble.AssistiveTouchService
 import com.lowdistraction.launcher.bubble.BubblePrefs
 import kotlin.math.abs
 import kotlin.math.cos
@@ -127,9 +128,13 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        // We are the launcher, so by definition nothing sensitive is in front.
+        AssistiveTouchService.clearSensitive()
         if (allApps.isNotEmpty()) loadApps()
         startBackgroundDrift()
         updateDevCheckBadge()
+        maybeRebuildFileIndex()
+        maybeOfferStrictResume()
     }
 
     override fun onPause() {
@@ -279,12 +284,78 @@ class MainActivity : Activity() {
 
     private fun openQuick(entry: QuickEntry) {
         quickFind.setText("")
+        val folder = entry.folder
+        if (folder != null) {
+            showFolder(folder)
+            return
+        }
         val id = entry.id
         if (id != null) {
             openDevCheck(DevCheck.tabFor(id))
             return
         }
         entry.intent?.let { startSafely(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+    }
+
+    /** Lists what is inside a folder result, so a folder is useful to tap too. */
+    private fun showFolder(folder: FileEntry) {
+        val children = FileIndex.children(this, folder)
+        if (children.isEmpty()) {
+            Toast.makeText(this, R.string.files_empty, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val labels = children.map { if (it.isDirectory) it.name + "/" else it.name }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle(folder.name)
+            .setItems(labels) { _, which -> openFileEntry(children[which]) }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun openFileEntry(f: FileEntry) {
+        if (f.isDirectory) {
+            showFolder(f)
+            return
+        }
+        startSafely(
+            Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(Uri.parse(f.uri), f.mime.ifEmpty { "*/*" })
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        )
+    }
+
+    /** Keeps the file index fresh without ever blocking the home screen. */
+    private fun maybeRebuildFileIndex() {
+        Thread {
+            runCatching {
+                if (!FileIndex.isEnabled(this)) return@runCatching
+                val stale = FileIndex.count(this) == 0 ||
+                    System.currentTimeMillis() - FileIndex.indexedAt(this) > INDEX_MAX_AGE_MS
+                if (stale) FileIndex.rebuild(this)
+            }
+        }.start()
+    }
+
+    /**
+     * Strict mode switches accessibility off over a sensitive app, and Android
+     * gives no way to switch it back on for us — so ask the user once.
+     */
+    private fun maybeOfferStrictResume() {
+        if (!SensitiveApps.isStrictPaused(this)) return
+        if (AssistiveTouchService.isReady) {
+            SensitiveApps.setStrictPaused(this, false)
+            return
+        }
+        SensitiveApps.setStrictPaused(this, false)
+        AlertDialog.Builder(this)
+            .setTitle(R.string.sensitive_paused_title)
+            .setMessage(R.string.sensitive_paused_message)
+            .setPositiveButton(R.string.sensitive_paused_ok) { _, _ ->
+                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun openDevCheck(tab: String?) {
@@ -477,6 +548,7 @@ class MainActivity : Activity() {
         private const val SWIPE_MIN = 100f
         private const val AUTO_OPEN_DELAY_MS = 350L
         private const val REQ_QUICK = 701
+        private const val INDEX_MAX_AGE_MS = 7L * 24 * 60 * 60 * 1000
         /** Degrees per second for the background — a full cycle takes ~5 minutes. */
         private const val BG_HUE_SPEED = 1.6f
         /** ~12fps is plenty for a glow that moves this slowly. */

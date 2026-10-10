@@ -152,6 +152,103 @@
             android:textSize="17sp"
             android:fontFamily="monospace" />
 
+        <!-- Payment & government apps -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="26dp"
+            android:text="@string/settings_section_privacy"
+            android:textColor="@color/textSecondary"
+            android:textSize="12sp"
+            android:letterSpacing="0.12"
+            android:fontFamily="monospace" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:paddingTop="14dp"
+                android:paddingBottom="14dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/settings_row_sensitive"
+                    android:textColor="@color/textPrimary"
+                    android:textSize="17sp"
+                    android:fontFamily="monospace" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/settings_sensitive_desc"
+                    android:textColor="@color/textSecondary"
+                    android:textSize="12sp"
+                    android:fontFamily="monospace" />
+            </LinearLayout>
+
+            <Switch
+                android:id="@+id/sensitive_switch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/row_sensitive_manage"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="?android:attr/selectableItemBackground"
+            android:paddingTop="14dp"
+            android:paddingBottom="14dp"
+            android:text="@string/settings_row_sensitive_manage"
+            android:textColor="@color/textPrimary"
+            android:textSize="17sp"
+            android:fontFamily="monospace" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:paddingTop="14dp"
+                android:paddingBottom="14dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/settings_row_strict"
+                    android:textColor="@color/textPrimary"
+                    android:textSize="17sp"
+                    android:fontFamily="monospace" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/settings_strict_desc"
+                    android:textColor="@color/textSecondary"
+                    android:textSize="12sp"
+                    android:fontFamily="monospace" />
+            </LinearLayout>
+
+            <Switch
+                android:id="@+id/strict_switch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
+
         <!-- Launcher -->
         <TextView
             android:layout_width="wrap_content"
@@ -186,6 +283,32 @@
             android:textColor="@color/textPrimary"
             android:textSize="17sp"
             android:fontFamily="monospace" />
+
+        <LinearLayout
+            android:id="@+id/row_files"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="?android:attr/selectableItemBackground"
+            android:orientation="vertical"
+            android:paddingTop="14dp"
+            android:paddingBottom="14dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/settings_row_files"
+                android:textColor="@color/textPrimary"
+                android:textSize="17sp"
+                android:fontFamily="monospace" />
+
+            <TextView
+                android:id="@+id/filesDesc"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/textSecondary"
+                android:textSize="12sp"
+                android:fontFamily="monospace" />
+        </LinearLayout>
 
         <!-- About -->
         <TextView

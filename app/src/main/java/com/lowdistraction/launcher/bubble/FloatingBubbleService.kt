@@ -41,6 +41,7 @@ class FloatingBubbleService : Service() {
     private var bubble: View? = null
     private var bubbleParams: WindowManager.LayoutParams? = null
     private var overlay: View? = null
+    private var bubbleHidden = false
 
     private val prefs by lazy { BubblePrefs(this) }
     private val handler = Handler(Looper.getMainLooper())
@@ -60,18 +61,45 @@ class FloatingBubbleService : Service() {
     override fun onCreate() {
         super.onCreate()
         running = true
+        instance = this
         wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         startForeground(NOTIF_ID, buildNotification())
         addBubble()
+        // The service can be (re)started while a sensitive app is already open.
+        applySensitive(AssistiveTouchService.sensitiveActive)
     }
 
     override fun onDestroy() {
         running = false
+        if (instance === this) instance = null
         handler.removeCallbacksAndMessages(null)
         removeOverlay()
         bubble?.let { runCatching { wm.removeView(it) } }
         bubble = null
+        bubbleHidden = false
         super.onDestroy()
+    }
+
+    /**
+     * Removes the bubble entirely while a payment or government app is in front,
+     * and puts it back the moment that app leaves. Called from
+     * [AssistiveTouchService], always on the main thread.
+     */
+    private fun applySensitive(sensitive: Boolean) {
+        if (sensitive) {
+            removeOverlay()
+            if (!bubbleHidden) {
+                bubble?.let { runCatching { wm.removeView(it) } }
+                bubbleHidden = true
+            }
+        } else if (bubbleHidden) {
+            val view = bubble
+            val params = bubbleParams
+            if (view != null && params != null) {
+                runCatching { wm.addView(view, params) }
+            }
+            bubbleHidden = false
+        }
     }
 
     // ------------------------------------------------------------- the bubble
@@ -293,6 +321,15 @@ class FloatingBubbleService : Service() {
         @Volatile
         var running = false
             private set
+
+        @Volatile
+        private var instance: FloatingBubbleService? = null
+
+        /** Hides / restores the bubble when a sensitive app comes or goes. */
+        fun onSensitiveChanged(sensitive: Boolean) {
+            val svc = instance ?: return
+            svc.handler.post { svc.applySensitive(sensitive) }
+        }
 
         private const val NOTIF_ID = 4211
         private const val CHANNEL_ID = "assistive_bubble"

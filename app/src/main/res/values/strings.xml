@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">Low Distraction</string>
     <string name="search_hint">Apps</string>
-    <string name="quickfind_hint">Settings, contacts…</string>
+    <string name="quickfind_hint">Settings, contacts, files…</string>
     <string name="quickfind_none">Nothing found</string>
     <string name="devcheck_badge">Dev.Check</string>
     <string name="devcheck_title">Dev.Check</string>
@@ -22,6 +22,33 @@
     <string name="settings_title">Settings</string>
     <string name="settings_back">Back</string>
     <string name="settings_section_bubble">ASSISTIVE BUBBLE</string>
+    <string name="settings_section_privacy">PAYMENT &amp; GOVERNMENT APPS</string>
+    <string name="settings_row_sensitive">Hide over payment &amp; gov apps</string>
+    <string name="settings_sensitive_desc">The bubble disappears and gestures pause while one of them is open</string>
+    <string name="settings_row_sensitive_manage">Sensitive apps</string>
+    <string name="settings_row_strict">Also pause accessibility</string>
+    <string name="settings_strict_desc">Off by default. Android cannot switch accessibility back on by itself, so you will be asked to restore it.</string>
+    <string name="sensitive_manage_title">Sensitive apps</string>
+    <string name="sensitive_auto_on">Auto-detect tap-to-pay apps: on</string>
+    <string name="sensitive_auto_off">Auto-detect tap-to-pay apps: off</string>
+    <string name="sensitive_add">Add an app…</string>
+    <string name="sensitive_remove">Remove %1$s</string>
+    <string name="sensitive_none_added">No extra apps added yet</string>
+    <string name="sensitive_builtin">Built-in list</string>
+    <string name="sensitive_paused_title">Accessibility is paused</string>
+    <string name="sensitive_paused_message">It was switched off automatically while a payment or government app was open. Turn it back on to bring the bubble\'s Back, Home and Lock actions back.</string>
+    <string name="sensitive_paused_ok">Open accessibility settings</string>
+
+    <string name="settings_row_files">Search inside files</string>
+    <string name="files_none">No folders added</string>
+    <string name="files_add">Add a folder…</string>
+    <string name="files_rebuild">Rebuild index</string>
+    <string name="files_remove">Remove %1$s</string>
+    <string name="files_desc">%1$d folder(s), %2$d items indexed</string>
+    <string name="files_indexing">Indexing…</string>
+    <string name="files_rebuild_done">Indexed %1$d items</string>
+    <string name="files_empty">That folder is empty</string>
+
     <string name="settings_section_launcher">LAUNCHER</string>
     <string name="settings_section_about">ABOUT</string>
     <string name="settings_row_pick_apps">Apps in the ring</string>

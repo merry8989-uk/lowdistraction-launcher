@@ -12,6 +12,10 @@
         <intent>
             <action android:name="android.intent.action.SEARCH" />
         </intent>
+        <!-- Lets us spot tap-to-pay (UPI) apps so the bubble can hide over them. -->
+        <intent>
+            <action android:name="android.nfc.cardemulation.HOST_APDU_SERVICE" />
+        </intent>
     </queries>
 
     <!-- The app must NEVER be able to reach the network. Declaring INTERNET with

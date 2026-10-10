@@ -1,0 +1,9 @@
+Quiet over payment & government apps, and files in search
+
+- The bubble now disappears on its own over payment and government apps, and
+  the bubble's gestures pause while one of them is open. Tap-to-pay apps are
+  detected automatically; you can add more from Settings.
+- New optional strict mode: also switch the accessibility service off over
+  those apps (off by default, since Android needs you to switch it back on).
+- The right search bar now also looks inside files and folders you share with
+  the app - documents, media and sub-folders, matched by name.

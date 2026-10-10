@@ -19,7 +19,9 @@ data class QuickEntry(
     val hint: String,
     val intent: Intent? = null,
     /** When set, the action is handled inside the app (see DevCheck). */
-    val id: String? = null
+    val id: String? = null,
+    /** When set, tapping opens this folder's contents. */
+    val folder: FileEntry? = null
 )
 
 /**
@@ -59,6 +61,7 @@ object QuickFind {
         val out = ArrayList<QuickEntry>()
         out += contactEntries(context, q)
         out += calendarEntries(context, q)
+        out += fileEntries(context, q)
         out += settingsEntries(q)
         if (includeDevCheck) {
             out += DevCheck.entries().filter { DevCheck.matches(it, q) }
@@ -76,6 +79,36 @@ object QuickFind {
         }
         return out
     }
+
+    /**
+     * Files and folders inside the folders the user has shared with the app,
+     * matched by name. Documents, media and sub-folders all turn up here.
+     */
+    private fun fileEntries(context: Context, query: String): List<QuickEntry> =
+        FileIndex.search(context, query, 10).map { f ->
+            if (f.isDirectory) {
+                QuickEntry(f.name, "Folder - ${f.where()}", folder = f)
+            } else {
+                val size = f.sizeText()
+                val hint = buildString {
+                    append(f.kind())
+                    append(" - ")
+                    append(f.where())
+                    if (size.isNotEmpty()) {
+                        append(" - ")
+                        append(size)
+                    }
+                }
+                QuickEntry(
+                    f.name,
+                    hint,
+                    Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(Uri.parse(f.uri), f.mime.ifEmpty { "*/*" })
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                )
+            }
+        }
 
     private fun settingsEntries(query: String): List<QuickEntry> {
         val q = query.lowercase()

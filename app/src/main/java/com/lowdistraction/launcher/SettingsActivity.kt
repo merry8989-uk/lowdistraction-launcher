@@ -15,7 +15,8 @@ import com.lowdistraction.launcher.bubble.FloatingBubbleService
 
 /**
  * The launcher's settings screen. Opened by long-pressing anywhere on the
- * home screen. Owns the assistive-bubble on/off switch and the contact link.
+ * home screen. Owns the assistive-bubble switch, the payment/government-app
+ * privacy controls, the folder search and the contact link.
  */
 class SettingsActivity : Activity() {
 
@@ -51,6 +52,9 @@ class SettingsActivity : Activity() {
         findViewById<View>(R.id.row_updates).setOnClickListener { openReleases() }
         findViewById<TextView>(R.id.updatesDesc).text =
             getString(R.string.settings_updates_desc, appVersion())
+
+        findViewById<View>(R.id.row_sensitive_manage).setOnClickListener { showSensitiveDialog() }
+        findViewById<View>(R.id.row_files).setOnClickListener { showFilesDialog() }
     }
 
     /**
@@ -87,6 +91,22 @@ class SettingsActivity : Activity() {
         devCheck.setOnCheckedChangeListener { _, isChecked ->
             ShortcutPrefs.setDevCheckEnabled(this, isChecked)
         }
+
+        val sensitive = findViewById<Switch>(R.id.sensitive_switch)
+        sensitive.setOnCheckedChangeListener(null)
+        sensitive.isChecked = SensitiveApps.isEnabled(this)
+        sensitive.setOnCheckedChangeListener { _, isChecked ->
+            SensitiveApps.setEnabled(this, isChecked)
+        }
+
+        val strict = findViewById<Switch>(R.id.strict_switch)
+        strict.setOnCheckedChangeListener(null)
+        strict.isChecked = SensitiveApps.isStrict(this)
+        strict.setOnCheckedChangeListener { _, isChecked ->
+            SensitiveApps.setStrict(this, isChecked)
+        }
+
+        updateFilesDesc()
     }
 
     private fun enableBubble() {
@@ -141,5 +161,166 @@ class SettingsActivity : Activity() {
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
+    }
+
+    // ------------------------------------------------- payment & government apps
+    private fun showSensitiveDialog() {
+        val items = ArrayList<String>()
+        val actions = ArrayList<() -> Unit>()
+
+        items += if (SensitiveApps.isAutoHce(this)) {
+            getString(R.string.sensitive_auto_on)
+        } else {
+            getString(R.string.sensitive_auto_off)
+        }
+        actions += {
+            SensitiveApps.setAutoHce(this, !SensitiveApps.isAutoHce(this))
+            showSensitiveDialog()
+        }
+
+        items += getString(R.string.sensitive_add)
+        actions += { pickSensitiveApp() }
+
+        val user = SensitiveApps.userPackages(this).sorted()
+        if (user.isEmpty()) {
+            items += getString(R.string.sensitive_none_added)
+            actions += {}
+        } else {
+            for (pkg in user) {
+                items += getString(R.string.sensitive_remove, SensitiveApps.label(this, pkg))
+                actions += {
+                    SensitiveApps.removeUserPackage(this, pkg)
+                    showSensitiveDialog()
+                }
+            }
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle(R.string.sensitive_manage_title)
+            .setItems(items.toTypedArray()) { _, which -> actions[which].invoke() }
+            .setNeutralButton(R.string.sensitive_builtin) { _, _ -> showBuiltInDialog() }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun pickSensitiveApp() {
+        val apps = AppRepository.loadApps(this)
+        if (apps.isEmpty()) return
+        val labels = apps.map { it.label }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle(R.string.sensitive_add)
+            .setItems(labels) { _, which ->
+                SensitiveApps.addUserPackage(this, apps[which].packageName)
+                showSensitiveDialog()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun showBuiltInDialog() {
+        val text = SensitiveApps.BUILT_IN.sorted()
+            .joinToString("\n") { "${SensitiveApps.label(this, it)}\n    $it" }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.sensitive_builtin)
+            .setMessage(text)
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
+    }
+
+    // ------------------------------------------------------------- file search
+    private fun showFilesDialog() {
+        val roots = FileIndex.roots(this)
+        val items = ArrayList<String>()
+        val actions = ArrayList<() -> Unit>()
+
+        items += getString(R.string.files_add)
+        actions += { pickFolder() }
+
+        if (roots.isNotEmpty()) {
+            items += getString(R.string.files_rebuild)
+            actions += { rebuildIndex() }
+        }
+
+        for (root in roots) {
+            items += getString(R.string.files_remove, folderLabel(root))
+            actions += {
+                runCatching {
+                    contentResolver.releasePersistableUriPermission(
+                        root, Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                }
+                FileIndex.removeRoot(this, root)
+                showFilesDialog()
+            }
+        }
+
+        if (roots.isEmpty()) {
+            items += getString(R.string.files_none)
+            actions += {}
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle(R.string.settings_row_files)
+            .setItems(items.toTypedArray()) { _, which -> actions[which].invoke() }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun folderLabel(uri: Uri): String =
+        runCatching { Uri.decode(uri.lastPathSegment ?: uri.toString()) }
+            .getOrDefault(uri.toString())
+
+    private fun pickFolder() {
+        startActivityForResult(
+            Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+            ),
+            REQ_FOLDER
+        )
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQ_FOLDER && resultCode == RESULT_OK) {
+            val uri = data?.data ?: return
+            runCatching {
+                contentResolver.takePersistableUriPermission(
+                    uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }
+            FileIndex.addRoot(this, uri)
+            rebuildIndex()
+        }
+    }
+
+    private fun rebuildIndex() {
+        Toast.makeText(this, R.string.files_indexing, Toast.LENGTH_SHORT).show()
+        Thread {
+            runCatching { FileIndex.rebuild(this) }
+            val count = runCatching { FileIndex.count(this) }.getOrDefault(0)
+            runOnUiThread {
+                Toast.makeText(
+                    this, getString(R.string.files_rebuild_done, count), Toast.LENGTH_LONG
+                ).show()
+                updateFilesDesc()
+            }
+        }.start()
+    }
+
+    private fun updateFilesDesc() {
+        val desc = findViewById<TextView>(R.id.filesDesc)
+        if (!FileIndex.isEnabled(this)) {
+            desc.text = getString(R.string.files_none)
+            return
+        }
+        Thread {
+            val roots = FileIndex.roots(this).size
+            val count = runCatching { FileIndex.count(this) }.getOrDefault(0)
+            runOnUiThread { desc.text = getString(R.string.files_desc, roots, count) }
+        }.start()
+    }
+
+    companion object {
+        private const val REQ_FOLDER = 902
     }
 }
