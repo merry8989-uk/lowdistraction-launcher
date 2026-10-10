@@ -83,6 +83,12 @@
             android:theme="@style/Theme.LowDistraction" />
 
         <activity
+            android:name=".AppearanceActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.LowDistraction" />
+
+        <activity
             android:name=".bubble.TeaModeActivity"
             android:exported="false"
             android:excludeFromRecents="true"

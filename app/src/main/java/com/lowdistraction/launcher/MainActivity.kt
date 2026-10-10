@@ -24,6 +24,8 @@ import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.view.WindowCompat
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.lowdistraction.launcher.bubble.AssistiveTouchService
@@ -61,6 +63,7 @@ class MainActivity : Activity() {
     private var quickToken = 0
 
     // Slow background drift
+    private lateinit var theme: Theme
     private var bgDrawable: GradientDrawable? = null
     private var bgHue = 205f
     private var bgT = 0f
@@ -83,6 +86,8 @@ class MainActivity : Activity() {
             onLaunch = { launch(it) },
             onLongPress = { app, view -> showAppMenu(app, view) }
         )
+        theme = Look.theme(this)
+        appAdapter.refreshLook(this)
         quickAdapter = QuickFindAdapter { entry -> openQuick(entry) }
 
         list.layoutManager = LinearLayoutManager(this)
@@ -131,11 +136,65 @@ class MainActivity : Activity() {
         // We are the launcher, so by definition nothing sensitive is in front.
         AssistiveTouchService.clearSensitive()
         if (allApps.isNotEmpty()) loadApps()
-        startBackgroundDrift()
+        applyLook()
         updateDevCheckBadge()
         maybeRebuildFileIndex()
         maybeOfferStrictResume()
     }
+
+    // ----------------------------------------------------------- appearance
+    /** Applies the saved theme and sizing to everything on this screen. */
+    private fun applyLook() {
+        theme = Look.theme(this)
+
+        findViewById<TextView>(R.id.clock).setTextColor(theme.textPrimary)
+        findViewById<TextView>(R.id.date).setTextColor(theme.textSecondary)
+        findViewById<TextView>(R.id.devCheckBadge).setTextColor(theme.accent)
+        search.setTextColor(theme.textPrimary)
+        search.setHintTextColor(theme.textSecondary)
+        quickFind.setTextColor(theme.textPrimary)
+        quickFind.setHintTextColor(theme.textSecondary)
+        emptyView.setTextColor(theme.textSecondary)
+
+        search.background = rounded(theme.surface, 10)
+        quickFind.background = rounded(theme.surface, 10)
+        findViewById<TextView>(R.id.devCheckBadge).background =
+            rounded(theme.surface, 14, Look.blend(theme.surface, theme.accent, 0.45f))
+
+        list.layoutManager = if (Look.displayMode(this) == DisplayMode.ICON) {
+            GridLayoutManager(this, gridSpans())
+        } else {
+            LinearLayoutManager(this)
+        }
+        appAdapter.refreshLook(this)
+
+        // Rebuild the background with the new palette and restart the drift.
+        bgDrawable = null
+        bgHue = theme.glowHue
+        startBackgroundDrift()
+
+        window.statusBarColor = theme.bg
+        window.navigationBarColor = theme.bg
+        val controller = WindowCompat.getInsetsController(window, window.decorView)
+        controller.isAppearanceLightStatusBars = theme.light
+        controller.isAppearanceLightNavigationBars = theme.light
+    }
+
+    private fun rounded(fill: Int, radiusDp: Int, stroke: Int? = null): GradientDrawable =
+        GradientDrawable().apply {
+            cornerRadius = dp(radiusDp).toFloat()
+            setColor(fill)
+            if (stroke != null) setStroke(dp(1), stroke)
+        }
+
+    private fun gridSpans(): Int {
+        val metrics = resources.displayMetrics
+        val widthDp = metrics.widthPixels / metrics.density - 40f
+        val cell = Look.iconSize(this) + 28f
+        return (widthDp / cell).toInt().coerceIn(3, 8)
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     override fun onPause() {
         super.onPause()
@@ -155,7 +214,7 @@ class MainActivity : Activity() {
                     resources.displayMetrics.widthPixels,
                     resources.displayMetrics.heightPixels
                 ) * 1.15f
-                colors = intArrayOf(0xFF101418.toInt(), 0xFF0B0B0C.toInt())
+                colors = intArrayOf(theme.bg, theme.bg)
             }
             root.background = gd
             bgDrawable = gd
@@ -180,16 +239,14 @@ class MainActivity : Activity() {
             bgHue = (bgHue + BG_HUE_SPEED * dt) % 360f
 
             // A soft coloured glow wanders slowly across the screen while the hue
-            // itself drifts, so the gradient keeps rearranging itself without ever
-            // being obvious about it.
+            // itself drifts, so the background keeps rearranging itself without
+            // ever being obvious about it. Its colours come from the theme.
             val cx = 0.5f + 0.34f * sin(bgT * 0.045f)
             val cy = 0.5f + 0.30f * cos(bgT * 0.031f)
+            val glow = if (Look.glowEnabled(this)) Look.glowColor(theme, bgHue) else theme.bg
             bgDrawable?.let { gd ->
                 gd.setGradientCenter(cx, cy)
-                gd.colors = intArrayOf(
-                    tint(bgHue, 0.32f),
-                    tint(bgHue + 34f, 0.05f)
-                )
+                gd.colors = intArrayOf(glow, theme.bg)
             }
             bgHandler.postDelayed(this, BG_FRAME_MS)
         }

@@ -1,0 +1,12 @@
+Appearance: icons, your own text, and 60+ themes
+
+- New Appearance screen in Settings.
+- App list style: name only (as before), icon only (shown as a grid), or icon
+  and name together.
+- Icons: size, shape (original, circle, rounded, square) and outline thickness.
+- Names: text size, bold, and letter spacing - make them as big or as bold as
+  you like.
+- 60+ built-in themes, dark and light, no downloads needed.
+- Theme creator: pick your own background, text, secondary text and accent
+  colours to build a theme of your own.
+- Optional drifting glow, now coloured by the theme.

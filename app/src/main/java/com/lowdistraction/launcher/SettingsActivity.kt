@@ -55,6 +55,9 @@ class SettingsActivity : Activity() {
 
         findViewById<View>(R.id.row_sensitive_manage).setOnClickListener { showSensitiveDialog() }
         findViewById<View>(R.id.row_files).setOnClickListener { showFilesDialog() }
+        findViewById<View>(R.id.row_appearance).setOnClickListener {
+            startActivity(Intent(this, AppearanceActivity::class.java))
+        }
     }
 
     /**
