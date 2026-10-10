@@ -518,10 +518,10 @@ class AppearanceActivity : Activity() {
     // ----------------------------------------------------------- custom theme
     private fun showCustomThemeDialog() {
         val current = Look.customTheme(this)
-        var bg = current.bg
-        var text = current.textPrimary
-        var text2 = current.textSecondary
-        var accent = current.accent
+        var bgColour = current.bg
+        var textColour = current.textPrimary
+        var textColour2 = current.textSecondary
+        var accentColour = current.accent
 
         fun open() {
             val dialogTheme = Look.theme(this)
@@ -531,7 +531,7 @@ class AppearanceActivity : Activity() {
             }
             box.addView(
                 TextView(this).apply {
-                    text = getString(R.string.appearance_custom_hint)
+                    setText(R.string.appearance_custom_hint)
                     setTextColor(dialogTheme.textSecondary)
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
                     typeface = Typeface.MONOSPACE
@@ -539,7 +539,7 @@ class AppearanceActivity : Activity() {
                 }
             )
 
-            fun colourRow(title: String, value: Int, apply: (Int) -> Unit) {
+            fun colourRow(title: String, value: Int, onColour: (Int) -> Unit) {
                 val row = LinearLayout(this).apply {
                     orientation = LinearLayout.HORIZONTAL
                     gravity = Gravity.CENTER_VERTICAL
@@ -548,28 +548,31 @@ class AppearanceActivity : Activity() {
                 }
                 row.addView(
                     TextView(this).apply {
-                        text = title
+                        setText(title)
                         setTextColor(dialogTheme.textPrimary)
                         setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
                         typeface = Typeface.MONOSPACE
                     },
                     LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
                 )
-                row.addView(swatch(value, dialogTheme.textSecondary), LinearLayout.LayoutParams(dp(30), dp(30)))
-                row.setOnClickListener { pickColor(title, value, apply) }
+                row.addView(
+                    swatch(value, dialogTheme.textSecondary),
+                    LinearLayout.LayoutParams(dp(30), dp(30))
+                )
+                row.setOnClickListener { pickColor(title, value, onColour) }
                 box.addView(row)
             }
 
-            colourRow(getString(R.string.appearance_custom_bg), bg) { bg = it; open() }
-            colourRow(getString(R.string.appearance_custom_text), text) { text = it; open() }
-            colourRow(getString(R.string.appearance_custom_text2), text2) { text2 = it; open() }
-            colourRow(getString(R.string.appearance_custom_accent), accent) { accent = it; open() }
+            colourRow(getString(R.string.appearance_custom_bg), bgColour) { bgColour = it; open() }
+            colourRow(getString(R.string.appearance_custom_text), textColour) { textColour = it; open() }
+            colourRow(getString(R.string.appearance_custom_text2), textColour2) { textColour2 = it; open() }
+            colourRow(getString(R.string.appearance_custom_accent), accentColour) { accentColour = it; open() }
 
             AlertDialog.Builder(this)
                 .setTitle(R.string.appearance_custom_title)
                 .setView(box)
                 .setPositiveButton(R.string.appearance_save) { _, _ ->
-                    Look.setCustomColours(this, bg, text, text2, accent)
+                    Look.setCustomColours(this, bgColour, textColour, textColour2, accentColour)
                     Look.setThemeId(this, Look.CUSTOM_ID)
                     buildUi()
                     Toast.makeText(this, R.string.appearance_saved, Toast.LENGTH_SHORT).show()

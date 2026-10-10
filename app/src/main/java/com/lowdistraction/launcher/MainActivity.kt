@@ -243,7 +243,11 @@ class MainActivity : Activity() {
             // ever being obvious about it. Its colours come from the theme.
             val cx = 0.5f + 0.34f * sin(bgT * 0.045f)
             val cy = 0.5f + 0.30f * cos(bgT * 0.031f)
-            val glow = if (Look.glowEnabled(this)) Look.glowColor(theme, bgHue) else theme.bg
+            val glow = if (Look.glowEnabled(this@MainActivity)) {
+                Look.glowColor(theme, bgHue)
+            } else {
+                theme.bg
+            }
             bgDrawable?.let { gd ->
                 gd.setGradientCenter(cx, cy)
                 gd.colors = intArrayOf(glow, theme.bg)
