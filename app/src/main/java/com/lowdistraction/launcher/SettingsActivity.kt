@@ -168,6 +168,16 @@ class SettingsActivity : Activity() {
         val items = ArrayList<String>()
         val actions = ArrayList<() -> Unit>()
 
+        items += if (SensitiveApps.isAutoName(this)) {
+            getString(R.string.sensitive_names_on)
+        } else {
+            getString(R.string.sensitive_names_off)
+        }
+        actions += {
+            SensitiveApps.setAutoName(this, !SensitiveApps.isAutoName(this))
+            showSensitiveDialog()
+        }
+
         items += if (SensitiveApps.isAutoHce(this)) {
             getString(R.string.sensitive_auto_on)
         } else {
@@ -195,6 +205,14 @@ class SettingsActivity : Activity() {
             }
         }
 
+        for (pkg in SensitiveApps.excludedPackages(this).sorted()) {
+            items += getString(R.string.sensitive_allow, SensitiveApps.label(this, pkg))
+            actions += {
+                SensitiveApps.removeExcluded(this, pkg)
+                showSensitiveDialog()
+            }
+        }
+
         AlertDialog.Builder(this)
             .setTitle(R.string.sensitive_manage_title)
             .setItems(items.toTypedArray()) { _, which -> actions[which].invoke() }
@@ -210,7 +228,11 @@ class SettingsActivity : Activity() {
         AlertDialog.Builder(this)
             .setTitle(R.string.sensitive_add)
             .setItems(labels) { _, which ->
-                SensitiveApps.addUserPackage(this, apps[which].packageName)
+                val app = apps[which]
+                SensitiveApps.hideBubble(this, app.packageName)
+                Toast.makeText(
+                    this, getString(R.string.sensitive_added, app.label), Toast.LENGTH_SHORT
+                ).show()
                 showSensitiveDialog()
             }
             .setNegativeButton(android.R.string.cancel, null)
@@ -218,8 +240,11 @@ class SettingsActivity : Activity() {
     }
 
     private fun showBuiltInDialog() {
-        val text = SensitiveApps.BUILT_IN.sorted()
-            .joinToString("\n") { "${SensitiveApps.label(this, it)}\n    $it" }
+        val text = buildString {
+            append(getString(R.string.sensitive_builtin_desc))
+            append("\n\n")
+            append(SensitiveApps.BUILT_IN.sorted().joinToString("\n"))
+        }
         AlertDialog.Builder(this)
             .setTitle(R.string.sensitive_builtin)
             .setMessage(text)

@@ -415,10 +415,13 @@ class MainActivity : Activity() {
     }
 
     private fun showAppMenu(app: AppInfo, anchor: View) {
+        val sensitive = SensitiveApps.isSensitive(this, app.packageName)
         val options = arrayOf(
             getString(R.string.action_app_info),
             getString(R.string.action_uninstall),
-            getString(R.string.action_hide)
+            getString(R.string.action_hide),
+            if (sensitive) getString(R.string.action_show_bubble)
+            else getString(R.string.action_hide_bubble)
         )
         AlertDialog.Builder(this)
             .setTitle(app.label)
@@ -429,6 +432,23 @@ class MainActivity : Activity() {
                     2 -> {
                         hiddenApps.hide(app.packageName)
                         loadApps()
+                    }
+                    3 -> {
+                        if (sensitive) {
+                            SensitiveApps.allowBubble(this, app.packageName)
+                            Toast.makeText(
+                                this,
+                                getString(R.string.sensitive_allowed, app.label),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        } else {
+                            SensitiveApps.hideBubble(this, app.packageName)
+                            Toast.makeText(
+                                this,
+                                getString(R.string.sensitive_added, app.label),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
                     }
                 }
             }

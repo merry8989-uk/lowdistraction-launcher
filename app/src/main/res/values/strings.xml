@@ -15,6 +15,8 @@
     <string name="action_uninstall">Uninstall</string>
     <string name="uninstall_unavailable">Couldn\'t open the uninstall dialog</string>
     <string name="action_hide">Hide app</string>
+    <string name="action_hide_bubble">Hide the bubble over this app</string>
+    <string name="action_show_bubble">Show the bubble over this app</string>
     <string name="hidden_apps">Hidden apps</string>
     <string name="no_hidden_apps">No hidden apps</string>
 
@@ -29,6 +31,12 @@
     <string name="settings_row_strict">Also pause accessibility</string>
     <string name="settings_strict_desc">Off by default. Android cannot switch accessibility back on by itself, so you will be asked to restore it.</string>
     <string name="sensitive_manage_title">Sensitive apps</string>
+    <string name="sensitive_names_on">Auto-detect by app name: on</string>
+    <string name="sensitive_names_off">Auto-detect by app name: off</string>
+    <string name="sensitive_added">Bubble will hide over %1$s</string>
+    <string name="sensitive_allowed">Bubble will show over %1$s</string>
+    <string name="sensitive_allow">Show the bubble again over %1$s</string>
+    <string name="sensitive_builtin_desc">These packages are always treated as sensitive. Apps are also matched by name and by tap-to-pay, so anything installed that looks like a payment or government app is covered even if it is not listed here.</string>
     <string name="sensitive_auto_on">Auto-detect tap-to-pay apps: on</string>
     <string name="sensitive_auto_off">Auto-detect tap-to-pay apps: off</string>
     <string name="sensitive_add">Add an app…</string>

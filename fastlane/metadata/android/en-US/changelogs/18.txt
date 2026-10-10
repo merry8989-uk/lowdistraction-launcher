@@ -1,0 +1,9 @@
+Sensitive apps: full list, auto-detection, and a one-tap toggle
+
+- The built-in list now covers UPI and wallet apps, banks, NBFCs and lenders,
+  brokers, insurers, and central and state government services.
+- New: apps are also matched by name and by tap-to-pay support, so anything
+  installed that looks like a payment or government app is covered even if it
+  was never listed.
+- New: long-press any app on the home screen and pick "Hide the bubble over
+  this app" or "Show the bubble over this app" to force it either way.
