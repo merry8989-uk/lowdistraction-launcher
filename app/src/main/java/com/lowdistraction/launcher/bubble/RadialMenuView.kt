@@ -17,6 +17,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import com.lowdistraction.launcher.AppInfo
 import com.lowdistraction.launcher.R
+import com.lowdistraction.launcher.WheelSound
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
