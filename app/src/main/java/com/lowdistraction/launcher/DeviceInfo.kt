@@ -30,15 +30,27 @@ object DeviceInfo {
 
     data class Row(val header: Boolean, val label: String, val value: String = "")
 
-    fun rows(context: Context, tab: String): List<Row> = when (tab) {
-        "Hardware" -> hardware(context)
-        "System" -> system(context)
-        "Battery" -> battery(context)
-        "Network" -> network(context)
-        "Apps" -> apps(context)
-        "Camera" -> camera(context)
-        "Sensors" -> sensors(context)
-        else -> dashboard(context)
+    /**
+     * Rows for a tab. Anything that can go wrong inside a tab is caught here, so
+     * a missing permission or an odd device can never take the window down.
+     */
+    fun rows(context: Context, tab: String): List<Row> = runCatching {
+        when (tab) {
+            "Hardware" -> hardware(context)
+            "System" -> system(context)
+            "Battery" -> battery(context)
+            "Network" -> network(context)
+            "Apps" -> apps(context)
+            "Camera" -> camera(context)
+            "Sensors" -> sensors(context)
+            else -> dashboard(context)
+        }
+    }.getOrElse { error ->
+        listOf(
+            Row(true, tab),
+            Row(false, "Unavailable", error.javaClass.simpleName),
+            Row(false, "Detail", error.message ?: "—")
+        )
     }
 
     // ------------------------------------------------------------------ tabs
@@ -180,32 +192,39 @@ object DeviceInfo {
     }
 
     private fun network(context: Context): List<Row> = buildList {
-        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val caps = cm.getNetworkCapabilities(cm.activeNetwork)
+        val cm = runCatching {
+            context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        }.getOrNull()
+
         add(Row(true, "Connection"))
+        val caps = runCatching {
+            cm?.activeNetwork?.let { cm.getNetworkCapabilities(it) }
+        }.getOrNull()
         add(Row(false, "Active", when {
+            cm == null -> "unavailable"
             caps == null -> "none"
             caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "Wi-Fi"
             caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "Cellular"
             caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "Ethernet"
             caps.hasTransport(NetworkCapabilities.TRANSPORT_BLUETOOTH) -> "Bluetooth"
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN) -> "VPN"
             else -> "other"
         }))
-        add(Row(false, "Metered", (cm.isActiveNetworkMetered).toString()))
+        add(
+            Row(
+                false,
+                "Metered",
+                runCatching { cm?.isActiveNetworkMetered }.getOrNull()?.toString() ?: "—"
+            )
+        )
 
-        val wifi = runCatching {
-            val wm = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-            if (wm.isWifiEnabled) "enabled" else "disabled"
-        }.getOrDefault("—")
         add(Row(true, "Wi-Fi"))
-        add(Row(false, "State", wifi))
-
-        val tm = runCatching { context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager }.getOrNull()
-        add(Row(true, "Mobile"))
-        add(Row(false, "Operator", runCatching { tm?.networkOperatorName }.getOrNull().orEmpty().ifEmpty { "—" }))
-        add(Row(false, "Country", runCatching { tm?.networkCountryIso }.getOrNull().orEmpty().ifEmpty { "—" }))
-        add(Row(false, "SIM state", simState(runCatching { tm?.simState }.getOrNull() ?: -1)))
-        add(Row(false, "Phone type", phoneType(runCatching { tm?.phoneType }.getOrNull() ?: -1)))
+        val wifi = runCatching {
+            val wm = context.applicationContext
+                .getSystemService(Context.WIFI_SERVICE) as WifiManager
+            if (wm.isWifiEnabled) "enabled" else "disabled"
+        }.getOrNull()
+        add(Row(false, "State", wifi ?: "—"))
 
         add(Row(true, "IP addresses"))
         val addresses = runCatching {
@@ -216,6 +235,17 @@ object DeviceInfo {
         }.getOrDefault(emptyList())
         if (addresses.isEmpty()) add(Row(false, "Addresses", "—"))
         else addresses.forEach { add(Row(false, "", it)) }
+
+        // The operator and SIM rows need READ_PHONE_STATE, which this app does not
+        // ask for, so they are deliberately left out and said so instead.
+        add(Row(true, "Note"))
+        add(
+            Row(
+                false,
+                "Operator & SIM",
+                "not shown — this app does not request the Phone permission"
+            )
+        )
     }
 
     private fun apps(context: Context): List<Row> = buildList {
@@ -257,22 +287,32 @@ object DeviceInfo {
     }
 
     private fun sensors(context: Context): List<Row> = buildList {
-        val sm = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
-        val list = sm.getSensorList(Sensor.TYPE_ALL)
+        val list = sensorList(context)
         if (list.isEmpty()) {
             add(Row(true, "Sensors"))
             add(Row(false, "Result", "No sensors reported"))
         }
         list.forEach { s ->
             add(Row(true, s.name))
-            add(Row(false, "Type", sensorType(s.type)))
-            add(Row(false, "Vendor", s.vendor))
-            add(Row(false, "Version", s.version.toString()))
-            add(Row(false, "Power", "${s.power} mA"))
-            add(Row(false, "Resolution", s.resolution.toString()))
-            add(Row(false, "Max range", s.maximumRange.toString()))
+            addAll(sensorMetaRows(s))
         }
     }
+
+    /** Every sensor the device reports, for the live read-out. */
+    fun sensorList(context: Context): List<Sensor> = runCatching {
+        (context.getSystemService(Context.SENSOR_SERVICE) as SensorManager)
+            .getSensorList(Sensor.TYPE_ALL)
+    }.getOrDefault(emptyList())
+
+    /** The fixed description of one sensor; the live value is added by the window. */
+    fun sensorMetaRows(sensor: Sensor): List<Row> = listOf(
+        Row(false, "Type", sensorType(sensor.type)),
+        Row(false, "Vendor", sensor.vendor),
+        Row(false, "Version", sensor.version.toString()),
+        Row(false, "Power", "${sensor.power} mA"),
+        Row(false, "Resolution", sensor.resolution.toString()),
+        Row(false, "Max range", sensor.maximumRange.toString())
+    )
 
     // --------------------------------------------------------------- helpers
     private fun batteryLevel(context: Context): String {
@@ -347,7 +387,7 @@ object DeviceInfo {
         else -> "none"
     }
 
-    private fun sensorType(t: Int): String = runCatching {
+    fun sensorType(t: Int): String = runCatching {
         Sensor::class.java.getField("TYPE_${t}").name
     }.getOrNull()?.removePrefix("TYPE_") ?: t.toString()
 }

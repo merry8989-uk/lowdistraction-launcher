@@ -1,0 +1,10 @@
+Dev.Check fixes: live sensors, and a Network tab that works
+
+- The Network tab no longer closes the app. It now reads connectivity safely and
+  shows the active connection, whether it is metered, the Wi-Fi state and the
+  device's IP addresses.
+- Operator and SIM details need the Phone permission, which this app does not
+  ask for, so that is now said plainly instead of the tab failing.
+- The Sensors tab is live: every sensor the device reports gets a value row that
+  keeps updating while the tab is open.
+- Any tab that hits a problem now reports it instead of taking the window down.

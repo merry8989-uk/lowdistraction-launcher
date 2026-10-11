@@ -51,6 +51,12 @@
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
 
+    <!-- Reading connectivity state for the Dev.Check window. Both are normal
+         permissions: granted automatically, no prompt, and neither gives the app
+         any way to reach the network. INTERNET stays stripped above. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+
     <!-- Settings shortcuts -->
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
     <uses-permission

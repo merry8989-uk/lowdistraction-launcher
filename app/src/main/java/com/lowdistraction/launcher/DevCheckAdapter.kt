@@ -17,6 +17,18 @@ class DevCheckAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
         notifyDataSetChanged()
     }
 
+    /**
+     * Replaces a single row's value in place. Used by the live sensor read-out so
+     * a changing number never disturbs the scroll position or the rest of the list.
+     */
+    fun updateValue(index: Int, value: String) {
+        if (index !in rows.indices) return
+        val current = rows[index]
+        if (current.value == value) return
+        rows[index] = current.copy(value = value)
+        notifyItemChanged(index)
+    }
+
     override fun getItemViewType(position: Int): Int = if (rows[position].header) 0 else 1
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
