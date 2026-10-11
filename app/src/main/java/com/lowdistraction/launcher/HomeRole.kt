@@ -26,6 +26,38 @@ object HomeRole {
         return resolved?.activityInfo?.packageName == context.packageName
     }
 
+    /**
+     * Opens the system screen where the default launcher is chosen — the
+     * "Default apps → Home app" picker. Returns false when nothing on this
+     * device could be opened, so callers can fall back to [request].
+     */
+    fun openHomeSettings(activity: Activity): Boolean {
+        val candidates = ArrayList<Intent>(2)
+        candidates.add(Intent(Settings.ACTION_HOME_SETTINGS))
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            candidates.add(Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS))
+        }
+        for (intent in candidates) {
+            try {
+                activity.startActivity(intent)
+                return true
+            } catch (_: Exception) {
+                // Try the next screen.
+            }
+        }
+        // Last resort: the system's own home chooser.
+        return try {
+            activity.startActivity(
+                Intent(Intent.ACTION_MAIN)
+                    .addCategory(Intent.CATEGORY_HOME)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     fun request(activity: Activity) {
         if (isDefault(activity)) return
 
@@ -43,13 +75,6 @@ object HomeRole {
             }
         }
 
-        // Fallback: open the system Home-app chooser.
-        try {
-            activity.startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
-        } catch (_: Exception) {
-            activity.startActivity(
-                Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
-            )
-        }
+        openHomeSettings(activity)
     }
 }

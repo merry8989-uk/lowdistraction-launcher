@@ -272,17 +272,31 @@
             android:textSize="17sp"
             android:fontFamily="monospace" />
 
-        <TextView
+        <LinearLayout
             android:id="@+id/row_default"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:background="?android:attr/selectableItemBackground"
+            android:orientation="vertical"
             android:paddingTop="14dp"
-            android:paddingBottom="14dp"
-            android:text="@string/settings_row_default"
-            android:textColor="@color/textPrimary"
-            android:textSize="17sp"
-            android:fontFamily="monospace" />
+            android:paddingBottom="14dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/settings_row_default"
+                android:textColor="@color/textPrimary"
+                android:textSize="17sp"
+                android:fontFamily="monospace" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/settings_row_default_desc"
+                android:textColor="@color/textSecondary"
+                android:textSize="12sp"
+                android:fontFamily="monospace" />
+        </LinearLayout>
 
         <LinearLayout
             android:id="@+id/row_files"

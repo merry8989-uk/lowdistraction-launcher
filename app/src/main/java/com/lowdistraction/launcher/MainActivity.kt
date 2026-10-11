@@ -470,7 +470,9 @@ class MainActivity : Activity() {
         AlertDialog.Builder(this)
             .setTitle(R.string.set_default_title)
             .setMessage(R.string.set_default_message)
-            .setPositiveButton(R.string.set_default_ok) { _, _ -> HomeRole.request(this) }
+            .setPositiveButton(R.string.set_default_ok) { _, _ ->
+                if (!HomeRole.openHomeSettings(this)) HomeRole.request(this)
+            }
             .setNegativeButton(R.string.set_default_later, null)
             .show()
     }

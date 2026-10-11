@@ -1,0 +1,7 @@
+Set as default launcher now opens the system picker
+
+- Tapping "Set as default launcher" in Settings goes straight to the system
+  screen where the default launcher is chosen (Default apps > Home app), so you
+  can pick it there.
+- The same applies to the first-run prompt's "Set default" button.
+- Falls back to the older system dialog on devices that have no such screen.

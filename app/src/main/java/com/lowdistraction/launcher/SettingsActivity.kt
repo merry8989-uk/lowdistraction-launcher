@@ -45,7 +45,10 @@ class SettingsActivity : Activity() {
 
         findViewById<View>(R.id.row_hidden).setOnClickListener { showHiddenAppsDialog() }
 
-        findViewById<View>(R.id.row_default).setOnClickListener { HomeRole.request(this) }
+        // Straight to the system screen where the default launcher is picked.
+        findViewById<View>(R.id.row_default).setOnClickListener {
+            if (!HomeRole.openHomeSettings(this)) HomeRole.request(this)
+        }
 
         findViewById<View>(R.id.row_contact).setOnClickListener { openInstagram() }
 
