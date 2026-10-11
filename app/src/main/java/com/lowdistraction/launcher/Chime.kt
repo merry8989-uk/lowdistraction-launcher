@@ -5,18 +5,21 @@ import android.media.AudioAttributes
 import android.media.SoundPool
 
 /**
- * Plays the same soft chime the assistive wheel uses, so the guide can let the
- * user hear it before they ever open the wheel.
+ * Plays the selected wheel chime. Used both by the guide's sound test and by the
+ * settings picker, and reloaded whenever the choice changes.
  */
 object Chime {
 
     private var pool: SoundPool? = null
     private var soundId = 0
+    private var loadedRes = -1
     private var loaded = false
     private var pending = false
 
     fun play(context: Context) {
         val sound = pool ?: create(context)
+        val res = WheelSound.resource(context)
+        if (res != loadedRes) load(context, sound, res)
         if (loaded) {
             sound.play(soundId, VOLUME, VOLUME, 1, 0, 1f)
         } else {
@@ -43,9 +46,14 @@ object Chime {
                 }
             }
         }
-        soundId = sound.load(context, R.raw.wheel_chime, 1)
         pool = sound
         return sound
+    }
+
+    private fun load(context: Context, sound: SoundPool, res: Int) {
+        loaded = false
+        loadedRes = res
+        soundId = sound.load(context, res, 1)
     }
 
     private const val VOLUME = 0.6f

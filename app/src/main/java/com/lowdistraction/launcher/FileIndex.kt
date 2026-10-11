@@ -103,10 +103,11 @@ object FileIndex {
             for (dir in c.getExternalFilesDirs(null)) {
                 if (dir == null) continue
                 // /storage/VOL/Android/data/<pkg>/files -> climb back to /storage/VOL
-                var f: File? = dir
-                repeat(4) { f = f?.parentFile }
-                if (f != null && f.path.startsWith("/storage/") && f.canRead() && f !in out) {
-                    out.add(f)
+                var climb: File? = dir
+                repeat(4) { climb = climb?.parentFile }
+                val root = climb ?: continue
+                if (root.path.startsWith("/storage/") && root.canRead() && root !in out) {
+                    out.add(root)
                 }
             }
         }

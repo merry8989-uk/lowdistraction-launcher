@@ -1,0 +1,9 @@
+Wheel sounds and pinned apps
+
+- The assistive wheel's chime is now a choice of 16 sounds: Soft chime, Bell,
+  Marimba, Glass, Wood block, Pluck, Drop, Ping, Halo, Bubble, Kalimba,
+  Vibraphone, Ceramic, Tine, Ripple and Night. Pick one from Settings and hear
+  it right away.
+- Pin up to four apps. They get their own row at the top of the home screen,
+  drawn bold and half again as large as everything else.
+- Long-press any app and choose "Pin to top", or manage the list from Settings.

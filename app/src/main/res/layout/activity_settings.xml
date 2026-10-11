@@ -152,6 +152,32 @@
             android:textSize="17sp"
             android:fontFamily="monospace" />
 
+        <LinearLayout
+            android:id="@+id/row_wheel_sound"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="?android:attr/selectableItemBackground"
+            android:orientation="vertical"
+            android:paddingTop="14dp"
+            android:paddingBottom="14dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/settings_row_wheel_sound"
+                android:textColor="@color/textPrimary"
+                android:textSize="17sp"
+                android:fontFamily="monospace" />
+
+            <TextView
+                android:id="@+id/wheelSoundDesc"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/textSecondary"
+                android:textSize="12sp"
+                android:fontFamily="monospace" />
+        </LinearLayout>
+
         <!-- Payment & government apps -->
         <TextView
             android:layout_width="wrap_content"
@@ -293,6 +319,32 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/settings_row_default_desc"
+                android:textColor="@color/textSecondary"
+                android:textSize="12sp"
+                android:fontFamily="monospace" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/row_pinned"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="?android:attr/selectableItemBackground"
+            android:orientation="vertical"
+            android:paddingTop="14dp"
+            android:paddingBottom="14dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/settings_row_pinned"
+                android:textColor="@color/textPrimary"
+                android:textSize="17sp"
+                android:fontFamily="monospace" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/settings_pinned_desc"
                 android:textColor="@color/textSecondary"
                 android:textSize="12sp"
                 android:fontFamily="monospace" />

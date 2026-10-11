@@ -17,6 +17,11 @@
     <string name="action_hide">Hide app</string>
     <string name="action_hide_bubble">Hide the bubble over this app</string>
     <string name="action_show_bubble">Show the bubble over this app</string>
+    <string name="action_pin">Pin to top</string>
+    <string name="action_unpin">Unpin</string>
+    <string name="pinned_added">%1$s pinned</string>
+    <string name="pinned_removed">%1$s unpinned</string>
+    <string name="pinned_full">You can pin up to %1$d apps</string>
     <string name="hidden_apps">Hidden apps</string>
     <string name="no_hidden_apps">No hidden apps</string>
 
@@ -169,6 +174,12 @@
     <string name="settings_sources_desc">What the second search box looks through</string>
     <string name="settings_row_guide">How to use</string>
     <string name="settings_guide_desc">Replay the first-run guide</string>
+    <string name="settings_row_pinned">Pinned apps</string>
+    <string name="settings_pinned_desc">Up to 4 apps in their own bold row at the top</string>
+    <string name="pinned_pick">Pin apps</string>
+    <string name="settings_row_wheel_sound">Wheel sound</string>
+    <string name="wheel_sound_title">Wheel sound</string>
+    <string name="wheel_sound_hint">Tap one to hear it. It plays as the wheel spins.</string>
 
     <!-- First-run guide -->
     <string name="guide_step">Step %1$d of %2$d</string>

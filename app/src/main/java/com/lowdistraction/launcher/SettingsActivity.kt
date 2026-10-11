@@ -54,6 +54,10 @@ class SettingsActivity : Activity() {
             startActivity(Intent(this, SearchSourcesActivity::class.java))
         }
 
+        findViewById<View>(R.id.row_pinned).setOnClickListener { showPinnedDialog() }
+
+        findViewById<View>(R.id.row_wheel_sound).setOnClickListener { showWheelSoundDialog() }
+
         findViewById<View>(R.id.row_guide).setOnClickListener {
             startActivity(Intent(this, GuideActivity::class.java))
         }
@@ -118,6 +122,8 @@ class SettingsActivity : Activity() {
         strict.setOnCheckedChangeListener { _, isChecked ->
             SensitiveApps.setStrict(this, isChecked)
         }
+
+        findViewById<TextView>(R.id.wheelSoundDesc).text = WheelSound.selected(this).name
     }
 
     private fun enableBubble() {
@@ -168,6 +174,54 @@ class SettingsActivity : Activity() {
             .setTitle(R.string.hidden_apps)
             .setItems(labels) { _, which ->
                 hiddenApps.unhide(packages[which])
+                Toast.makeText(this, R.string.bubble_saved, Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    // ---------------------------------------------------------- wheel & pins
+    private fun showWheelSoundDialog() {
+        val options = WheelSound.ALL
+        val labels = options.map { it.name }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle(R.string.wheel_sound_title)
+            .setSingleChoiceItems(labels, options.indexOf(WheelSound.selected(this))) { dialog, which ->
+                WheelSound.setSelected(this, options[which].id)
+                Chime.play(this)
+                findViewById<TextView>(R.id.wheelSoundDesc).text = options[which].name
+                dialog.dismiss()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun showPinnedDialog() {
+        val apps = AppRepository.loadApps(this)
+        if (apps.isEmpty()) return
+        val store = PinnedApps(this)
+        val pinned = store.all().toSet()
+        val labels = apps.map { it.label }.toTypedArray()
+        val checked = BooleanArray(apps.size) {
+            apps[it].component.flattenToString() in pinned
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.pinned_pick)
+            .setMultiChoiceItems(labels, checked) { dialog, which, isChecked ->
+                checked[which] = isChecked
+                if (isChecked && checked.count { it } > PinnedApps.MAX) {
+                    checked[which] = false
+                    (dialog as? AlertDialog)?.listView?.setItemChecked(which, false)
+                    Toast.makeText(
+                        this, getString(R.string.pinned_full, PinnedApps.MAX), Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                store.set(
+                    apps.filterIndexed { index, _ -> checked[index] }
+                        .map { it.component.flattenToString() }
+                )
                 Toast.makeText(this, R.string.bubble_saved, Toast.LENGTH_SHORT).show()
             }
             .setNegativeButton(android.R.string.cancel, null)

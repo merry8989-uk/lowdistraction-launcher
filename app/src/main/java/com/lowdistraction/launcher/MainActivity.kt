@@ -7,6 +7,7 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
@@ -17,11 +18,15 @@ import android.provider.MediaStore
 import android.provider.Settings
 import android.text.Editable
 import android.text.TextWatcher
+import android.util.TypedValue
 import android.view.GestureDetector
+import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
+import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.view.WindowCompat
@@ -173,6 +178,7 @@ class MainActivity : Activity() {
         }
         appAdapter.refreshLook(this)
         applyQuickFindVisibility()
+        renderPinned()
 
         // Rebuild the background with the new palette and restart the drift.
         bgDrawable = null
@@ -192,6 +198,77 @@ class MainActivity : Activity() {
         quickFind.visibility = if (on) View.VISIBLE else View.GONE
         if (!on && !quickFind.text.isNullOrEmpty()) quickFind.setText("")
         quickFind.hint = SearchSources.hint(this)
+    }
+
+    /**
+     * The pinned apps get their own row above the list: always bold — heavier
+     * than anything else on screen — and half again the chosen text size.
+     */
+    private fun renderPinned() {
+        if (!::theme.isInitialized) theme = Look.theme(this)
+        val box = findViewById<LinearLayout>(R.id.pinnedBox)
+        val divider = findViewById<View>(R.id.pinnedDivider)
+        box.removeAllViews()
+
+        val byComponent = allApps.associateBy { it.component.flattenToString() }
+        val apps = PinnedApps(this).all().mapNotNull { byComponent[it] }
+        if (apps.isEmpty()) {
+            box.visibility = View.GONE
+            divider.visibility = View.GONE
+            return
+        }
+        box.visibility = View.VISIBLE
+        divider.visibility = View.VISIBLE
+        divider.setBackgroundColor(Look.blend(theme.bg, theme.textSecondary, 0.35f))
+
+        val mode = Look.displayMode(this)
+        val density = resources.displayMetrics.density
+        val iconPx = (Look.iconSize(this) * PINNED_SCALE * density).toInt()
+
+        for (app in apps) {
+            val row = layoutInflater.inflate(R.layout.item_app, box, false) as LinearLayout
+            val icon = row.findViewById<ImageView>(R.id.appIcon)
+            val label = row.findViewById<TextView>(R.id.appLabel)
+
+            label.text = app.label
+            label.setTextSize(TypedValue.COMPLEX_UNIT_SP, Look.nameSize(this) * PINNED_SCALE)
+            label.setTypeface(Typeface.MONOSPACE, Typeface.BOLD)
+            label.paint.isFakeBoldText = true
+            label.letterSpacing = Look.nameSpacing(this) / 100f
+            label.setTextColor(theme.textPrimary)
+
+            if (mode == DisplayMode.NAME) {
+                icon.visibility = View.GONE
+            } else {
+                icon.visibility = View.VISIBLE
+                val lp = icon.layoutParams as LinearLayout.LayoutParams
+                lp.width = iconPx
+                lp.height = iconPx
+                icon.layoutParams = lp
+                val labelLp = label.layoutParams as LinearLayout.LayoutParams
+                labelLp.marginStart = dp(14)
+                label.layoutParams = labelLp
+                runCatching { packageManager.getApplicationIcon(app.packageName) }
+                    .getOrNull()
+                    ?.let { base ->
+                        icon.setImageDrawable(
+                            ShapedIconDrawable(
+                                base,
+                                Look.iconShape(this),
+                                Look.iconOutline(this) * density,
+                                theme.accent
+                            )
+                        )
+                    }
+            }
+
+            row.setOnClickListener { launch(app) }
+            row.setOnLongClickListener { view ->
+                showAppMenu(app, view)
+                true
+            }
+            box.addView(row)
+        }
     }
 
     private fun rounded(fill: Int, radiusDp: Int, stroke: Int? = null): GradientDrawable =
@@ -284,6 +361,7 @@ class MainActivity : Activity() {
             runOnUiThread {
                 allApps = apps
                 if (quickFind.text.isNullOrEmpty()) filter(search.text?.toString().orEmpty())
+                renderPinned()
             }
         }.start()
     }
@@ -497,12 +575,15 @@ class MainActivity : Activity() {
 
     private fun showAppMenu(app: AppInfo, anchor: View) {
         val sensitive = SensitiveApps.isSensitive(this, app.packageName)
+        val component = app.component.flattenToString()
+        val pinned = PinnedApps(this).isPinned(component)
         val options = arrayOf(
             getString(R.string.action_app_info),
             getString(R.string.action_uninstall),
             getString(R.string.action_hide),
             if (sensitive) getString(R.string.action_show_bubble)
-            else getString(R.string.action_hide_bubble)
+            else getString(R.string.action_hide_bubble),
+            if (pinned) getString(R.string.action_unpin) else getString(R.string.action_pin)
         )
         AlertDialog.Builder(this)
             .setTitle(app.label)
@@ -530,6 +611,19 @@ class MainActivity : Activity() {
                                 Toast.LENGTH_SHORT
                             ).show()
                         }
+                    }
+                    4 -> {
+                        val store = PinnedApps(this)
+                        val message = if (pinned) {
+                            store.remove(component)
+                            getString(R.string.pinned_removed, app.label)
+                        } else if (store.add(component)) {
+                            getString(R.string.pinned_added, app.label)
+                        } else {
+                            getString(R.string.pinned_full, PinnedApps.MAX)
+                        }
+                        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+                        renderPinned()
                     }
                 }
             }
@@ -650,6 +744,8 @@ class MainActivity : Activity() {
         private const val AUTO_OPEN_DELAY_MS = 350L
         private const val REQ_QUICK = 701
         private const val INDEX_MAX_AGE_MS = 7L * 24 * 60 * 60 * 1000
+        /** Pinned rows are drawn half again as large as the rest. */
+        private const val PINNED_SCALE = 1.5f
         /** Degrees per second for the background — a full cycle takes ~5 minutes. */
         private const val BG_HUE_SPEED = 1.6f
         /** ~12fps is plenty for a glow that moves this slowly. */

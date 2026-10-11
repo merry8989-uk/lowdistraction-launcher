@@ -106,7 +106,7 @@ class RadialMenuView(
 
     init {
         setBackgroundColor(0x99000000.toInt())
-        chimeId = soundPool.load(context, R.raw.wheel_chime, 1)
+        chimeId = soundPool.load(context, WheelSound.resource(context), 1)
 
         val margin = (ringRadius + slotSize / 2f + dp(8)).toInt()
         val bottomReserve = dp(110)
