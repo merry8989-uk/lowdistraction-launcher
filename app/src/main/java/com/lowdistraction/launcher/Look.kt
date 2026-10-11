@@ -57,6 +57,8 @@ object Look {
     private const val KEY_CUSTOM_TEXT2 = "custom_text2"
     private const val KEY_CUSTOM_ACCENT = "custom_accent"
     private const val KEY_CUSTOM_LIGHT = "custom_light"
+    private const val KEY_PIN_ROWS = "pin_rows"
+    private const val KEY_PIN_COLS = "pin_cols"
 
     const val CUSTOM_ID = "custom"
     const val DEFAULT_THEME_ID = "mint"
@@ -154,6 +156,26 @@ object Look {
     fun reset(c: Context) {
         prefs(c).edit().clear().apply()
     }
+
+    // ----------------------------------------------------------- pinned grid
+    /**
+     * How the pinned grid is laid out. A fresh install is 3 rows by 2 columns;
+     * the user can grow it up to 10 by 4 from Settings.
+     */
+    fun pinnedRows(c: Context): Int =
+        prefs(c).getInt(KEY_PIN_ROWS, DEFAULT_PIN_ROWS).coerceIn(1, MAX_PIN_ROWS)
+
+    fun setPinnedRows(c: Context, rows: Int) =
+        prefs(c).edit().putInt(KEY_PIN_ROWS, rows.coerceIn(1, MAX_PIN_ROWS)).apply()
+
+    fun pinnedCols(c: Context): Int =
+        prefs(c).getInt(KEY_PIN_COLS, DEFAULT_PIN_COLS).coerceIn(1, MAX_PIN_COLS)
+
+    fun setPinnedCols(c: Context, cols: Int) =
+        prefs(c).edit().putInt(KEY_PIN_COLS, cols.coerceIn(1, MAX_PIN_COLS)).apply()
+
+    /** How many pinned apps the current grid can hold. */
+    fun pinnedCapacity(c: Context): Int = pinnedRows(c) * pinnedCols(c)
 
     // ------------------------------------------------------------- colour maths
     fun hsv(hue: Float, sat: Float, value: Float): Int =
@@ -313,4 +335,8 @@ object Look {
     const val MAX_OUTLINE = 4
     const val MIN_NAME = 11
     const val MAX_NAME = 34
+    const val DEFAULT_PIN_ROWS = 3
+    const val DEFAULT_PIN_COLS = 2
+    const val MAX_PIN_ROWS = 10
+    const val MAX_PIN_COLS = 4
 }

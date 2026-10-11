@@ -57,6 +57,13 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 
+    <!-- Optional: only used by the "most time used" sort. The user grants it by
+         hand from Settings > Special access > Usage access; without it that one
+         sort option simply stays inactive. Nothing is ever sent anywhere. -->
+    <uses-permission
+        android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+
     <!-- Settings shortcuts -->
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
     <uses-permission

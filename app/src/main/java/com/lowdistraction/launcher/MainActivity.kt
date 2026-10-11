@@ -61,6 +61,7 @@ class MainActivity : Activity() {
     private lateinit var search: EditText
     private lateinit var quickFind: EditText
     private lateinit var devCheckBadge: View
+    private lateinit var sortChip: TextView
     private lateinit var hiddenApps: HiddenApps
 
     private var allApps: List<AppInfo> = emptyList()
@@ -97,6 +98,9 @@ class MainActivity : Activity() {
         devCheckBadge = findViewById(R.id.devCheckBadge)
         devCheckBadge.setOnClickListener { openDevCheck(null) }
         devCheckBadge.setOnLongClickListener { openSettings(); true }
+
+        sortChip = findViewById(R.id.sortChip)
+        sortChip.setOnClickListener { showSortDialog() }
 
         appAdapter = AppListAdapter(
             onLaunch = { requestLaunch(it) },
@@ -184,6 +188,10 @@ class MainActivity : Activity() {
         quickFind.background = rounded(theme.surface, 10)
         findViewById<TextView>(R.id.devCheckBadge).background =
             rounded(theme.surface, 14, Look.blend(theme.surface, theme.accent, 0.45f))
+        sortChip.setTextColor(theme.accent)
+        sortChip.background =
+            rounded(theme.surface, 14, Look.blend(theme.surface, theme.accent, 0.45f))
+        updateSortChip()
 
         list.layoutManager = if (Look.displayMode(this) == DisplayMode.ICON) {
             GridLayoutManager(this, gridSpans())
@@ -226,7 +234,10 @@ class MainActivity : Activity() {
         box.removeAllViews()
 
         val byComponent = allApps.associateBy { it.component.flattenToString() }
-        val apps = PinnedApps(this).all().mapNotNull { byComponent[it] }
+        val columns = Look.pinnedCols(this)
+        val apps = PinnedApps(this).all()
+            .mapNotNull { byComponent[it] }
+            .take(Look.pinnedCapacity(this))
         if (apps.isEmpty()) {
             box.visibility = View.GONE
             divider.visibility = View.GONE
@@ -236,7 +247,7 @@ class MainActivity : Activity() {
         divider.visibility = View.VISIBLE
         divider.setBackgroundColor(Look.blend(theme.bg, theme.textSecondary, 0.35f))
 
-        for (pair in apps.chunked(PINNED_COLUMNS)) {
+        for (pair in apps.chunked(columns)) {
             val line = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
             for (app in pair) {
                 line.addView(
@@ -245,7 +256,7 @@ class MainActivity : Activity() {
                 )
             }
             // Keep the columns aligned when the last row is half full.
-            repeat(PINNED_COLUMNS - pair.size) {
+            repeat(columns - pair.size) {
                 line.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
             }
             box.addView(line)
@@ -403,11 +414,12 @@ class MainActivity : Activity() {
 
         val q = query.trim().lowercase()
         val visible = allApps.filter { !hiddenApps.isHidden(it.packageName) }
-        val filtered = if (q.isEmpty()) {
+        val matched = if (q.isEmpty()) {
             visible
         } else {
             visible.filter { it.label.lowercase().contains(q) }
         }
+        val filtered = AppSorter.sort(this, matched, SortPrefs.mode(this))
 
         currentResults = filtered
         appAdapter.submit(filtered)
@@ -594,7 +606,55 @@ class MainActivity : Activity() {
         }
     }
 
+    // -------------------------------------------------------------- sorting
+    private fun updateSortChip() {
+        sortChip.text = getString(R.string.sort_chip, getString(sortLabel(SortPrefs.mode(this))))
+    }
+
+    private fun showSortDialog() {
+        val modes = SortMode.entries
+        val labels = modes.map { getString(sortLabel(it)) }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle(R.string.sort_title)
+            .setSingleChoiceItems(labels, modes.indexOf(SortPrefs.mode(this))) { dialog, which ->
+                val mode = modes[which]
+                dialog.dismiss()
+                if (mode == SortMode.MOST_TIME && !AppSorter.hasUsageAccess(this)) {
+                    promptUsageAccess()
+                    return@setSingleChoiceItems
+                }
+                SortPrefs.setMode(this, mode)
+                updateSortChip()
+                filter(search.text?.toString().orEmpty())
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    /** "Most time used" needs Usage access, which only the system can grant. */
+    private fun promptUsageAccess() {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.sort_usage_title)
+            .setMessage(R.string.sort_usage_message)
+            .setPositiveButton(R.string.sort_usage_ok) { _, _ ->
+                startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun sortLabel(mode: SortMode): Int = when (mode) {
+        SortMode.NAME -> R.string.sort_name
+        SortMode.NAME_DESC -> R.string.sort_name_desc
+        SortMode.INSTALLED -> R.string.sort_installed
+        SortMode.UPDATED -> R.string.sort_updated
+        SortMode.MOST_OPENED -> R.string.sort_most_opened
+        SortMode.RECENTLY_USED -> R.string.sort_recent
+        SortMode.MOST_TIME -> R.string.sort_most_time
+    }
+
     private fun launch(app: AppInfo) {
+        AppUsage.record(this, app.component.flattenToString())
         val intent = Intent(Intent.ACTION_MAIN).apply {
             addCategory(Intent.CATEGORY_LAUNCHER)
             component = app.component
@@ -805,13 +865,14 @@ class MainActivity : Activity() {
                     }
                     4 -> {
                         val store = PinnedApps(this)
+                        val capacity = Look.pinnedCapacity(this)
                         val message = if (pinned) {
                             store.remove(component)
                             getString(R.string.pinned_removed, app.label)
-                        } else if (store.add(component)) {
+                        } else if (store.all().size < capacity && store.add(component)) {
                             getString(R.string.pinned_added, app.label)
                         } else {
-                            getString(R.string.pinned_full, PinnedApps.MAX)
+                            getString(R.string.pinned_full, capacity)
                         }
                         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
                         renderPinned()
@@ -946,8 +1007,6 @@ class MainActivity : Activity() {
         private const val INDEX_MAX_AGE_MS = 7L * 24 * 60 * 60 * 1000
         /** Pinned rows are drawn half again as large as the rest. */
         private const val PINNED_SCALE = 1.5f
-        /** Pinned apps sit in two columns, so four rows hold eight. */
-        private const val PINNED_COLUMNS = 2
         /** The breather before an app opens. */
         private const val PAUSE_SECONDS = 7
         private const val LOCK_DEBOUNCE_MS = 600L

@@ -10,6 +10,9 @@ import java.util.Locale
 /**
  * Enumerates the apps that expose a launcher entry, de-duplicates them and
  * returns them sorted by label using the device's locale collation.
+ *
+ * Install and update times are collected here too, in the same pass, so the
+ * sort options have them ready without touching the package manager again.
  */
 object AppRepository {
 
@@ -25,10 +28,17 @@ object AppRepository {
 
         return resolved
             .map { info ->
+                val pkg = info.activityInfo.packageName
+                val times = runCatching {
+                    val packageInfo = pm.getPackageInfo(pkg, 0)
+                    packageInfo.firstInstallTime to packageInfo.lastUpdateTime
+                }.getOrDefault(0L to 0L)
                 AppInfo(
-                    label = info.loadLabel(pm).toString().trim().ifEmpty { info.activityInfo.packageName },
-                    packageName = info.activityInfo.packageName,
-                    component = ComponentName(info.activityInfo.packageName, info.activityInfo.name)
+                    label = info.loadLabel(pm).toString().trim().ifEmpty { pkg },
+                    packageName = pkg,
+                    component = ComponentName(pkg, info.activityInfo.name),
+                    installedAt = times.first,
+                    updatedAt = times.second
                 )
             }
             .distinctBy { it.component.flattenToString() }

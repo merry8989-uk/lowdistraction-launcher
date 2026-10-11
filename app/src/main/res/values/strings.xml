@@ -175,8 +175,13 @@
     <string name="settings_row_guide">How to use</string>
     <string name="settings_guide_desc">Replay the first-run guide</string>
     <string name="settings_row_pinned">Pinned apps</string>
-    <string name="settings_pinned_desc">Up to 8 apps in their own bold grid at the top</string>
-    <string name="pinned_pick">Pin apps</string>
+    <string name="settings_pinned_desc">A bold grid of your own apps — nothing is pinned until you say so</string>
+    <string name="pinned_pick">Choose apps…</string>
+    <string name="pinned_grid">Pinned grid</string>
+    <string name="pinned_grid_row">Grid size: %1$d × %2$d</string>
+    <string name="pinned_grid_summary">%1$d rows × %2$d columns — up to %3$d apps</string>
+    <string name="pin_rows">Rows</string>
+    <string name="pin_cols">Columns</string>
     <string name="settings_row_wheel_sound">Wheel sound</string>
     <string name="wheel_sound_title">Wheel sound</string>
     <string name="wheel_sound_hint">Tap one to hear it. It plays as the wheel spins.</string>
@@ -189,6 +194,20 @@
     <string name="pause_cancel_hint">Tap anywhere to cancel · 7 seconds</string>
     <string name="pause_cancelled">%1$s not opened</string>
     <string name="lock_needs_accessibility">Turn on the accessibility service to lock the screen</string>
+
+    <!-- App sorting -->
+    <string name="sort_title">Sort apps by</string>
+    <string name="sort_chip">Sort: %1$s</string>
+    <string name="sort_name">Name (A–Z)</string>
+    <string name="sort_name_desc">Name (Z–A)</string>
+    <string name="sort_installed">Recently installed</string>
+    <string name="sort_updated">Recently updated</string>
+    <string name="sort_most_opened">Most opened</string>
+    <string name="sort_recent">Recently used</string>
+    <string name="sort_most_time">Most time used</string>
+    <string name="sort_usage_title">Usage access needed</string>
+    <string name="sort_usage_message">Sorting by time used needs Usage access, which Android only grants from a system screen. The figures are read on this device and never leave it.</string>
+    <string name="sort_usage_ok">Open usage access</string>
 
     <!-- First-run guide -->
     <string name="guide_step">Step %1$d of %2$d</string>

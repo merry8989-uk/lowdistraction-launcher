@@ -1,0 +1,11 @@
+Custom pinned grid, and sorting the app list
+
+- The pinned grid is now yours to shape: choose 1 to 10 rows and 1 to 4 columns
+  from Settings > Pinned apps > Grid size. A fresh install stays at 3 rows by 2
+  columns, and nothing is ever pinned on its own - the grid stays empty until
+  you pin something yourself.
+- New sort control above the search box: name A-Z, name Z-A, recently installed,
+  recently updated, most opened, recently used, and most time used.
+  Everything except the last one works with no permission at all. "Most time
+  used" reads the system's usage figures, so it needs Usage access, which you
+  grant by hand; until then that option simply stays inactive.

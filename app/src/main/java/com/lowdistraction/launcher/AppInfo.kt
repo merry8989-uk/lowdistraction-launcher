@@ -6,5 +6,8 @@ import android.content.ComponentName
 data class AppInfo(
     val label: String,
     val packageName: String,
-    val component: ComponentName
+    val component: ComponentName,
+    /** When the app was first installed, and last updated, in millis. */
+    val installedAt: Long = 0L,
+    val updatedAt: Long = 0L
 )

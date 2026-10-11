@@ -2,7 +2,16 @@ package com.lowdistraction.launcher
 
 import android.content.Context
 
-/** Up to eight apps shown in their own emphasised grid on the home screen. */
+/**
+ * The apps the user pinned to the top of the home screen.
+ *
+ * **Nothing is ever pinned automatically.** The list starts empty on a fresh
+ * install and only ever grows when the user pins something themselves.
+ *
+ * [MAX] is just the absolute ceiling — the biggest grid Settings allows (10 rows
+ * by 4 columns). What actually applies is [Look.pinnedCapacity], which follows
+ * the grid the user has chosen.
+ */
 class PinnedApps(context: Context) {
 
     private val prefs = context.getSharedPreferences("pinned_apps", Context.MODE_PRIVATE)
@@ -12,7 +21,7 @@ class PinnedApps(context: Context) {
 
     fun isPinned(component: String): Boolean = component in all()
 
-    /** Returns false when the four slots are already taken. */
+    /** Returns false when the ceiling is already reached. */
     fun add(component: String): Boolean {
         val current = all()
         if (component in current) return true
@@ -29,7 +38,8 @@ class PinnedApps(context: Context) {
         prefs.edit().putString(KEY, list.joinToString("\n")).apply()
 
     companion object {
-        const val MAX = 8
+        /** 10 rows by 4 columns — the largest grid the appearance settings allow. */
+        const val MAX = 40
         private const val KEY = "components"
     }
 }

@@ -3,10 +3,14 @@ package com.lowdistraction.launcher
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
+import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
+import android.util.TypedValue
 import android.view.View
+import android.widget.LinearLayout
+import android.widget.SeekBar
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
@@ -203,10 +207,88 @@ class SettingsActivity : Activity() {
             .show()
     }
 
+    /** Pinned apps: the grid's shape, then which apps sit in it. */
     private fun showPinnedDialog() {
+        val items = arrayOf(
+            getString(R.string.pinned_grid_row, Look.pinnedRows(this), Look.pinnedCols(this)),
+            getString(R.string.pinned_pick)
+        )
+        AlertDialog.Builder(this)
+            .setTitle(R.string.settings_row_pinned)
+            .setItems(items) { _, which ->
+                if (which == 0) showGridDialog() else showPinnedPicker()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    /** Rows and columns, up to 10 by 4. A fresh install is 3 by 2. */
+    private fun showGridDialog() {
+        val theme = Look.theme(this)
+        val summary = TextView(this).apply {
+            setText(
+                getString(
+                    R.string.pinned_grid_summary,
+                    Look.pinnedRows(this@SettingsActivity),
+                    Look.pinnedCols(this@SettingsActivity),
+                    Look.pinnedCapacity(this@SettingsActivity)
+                )
+            )
+            setTextColor(theme.accent)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+            typeface = Typeface.MONOSPACE
+        }
+        val rowsBar = SeekBar(this).apply {
+            max = Look.MAX_PIN_ROWS - 1
+            progress = Look.pinnedRows(this@SettingsActivity) - 1
+        }
+        val colsBar = SeekBar(this).apply {
+            max = Look.MAX_PIN_COLS - 1
+            progress = Look.pinnedCols(this@SettingsActivity) - 1
+        }
+        fun refresh() {
+            val rows = rowsBar.progress + 1
+            val cols = colsBar.progress + 1
+            summary.setText(getString(R.string.pinned_grid_summary, rows, cols, rows * cols))
+        }
+        rowsBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) = refresh()
+            override fun onStartTrackingTouch(sb: SeekBar?) {}
+            override fun onStopTrackingTouch(sb: SeekBar?) {}
+        })
+        colsBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) = refresh()
+            override fun onStartTrackingTouch(sb: SeekBar?) {}
+            override fun onStopTrackingTouch(sb: SeekBar?) {}
+        })
+
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(24), dp(12), dp(24), 0)
+        }
+        box.addView(summary)
+        box.addView(smallLabel(getString(R.string.pin_rows), theme))
+        box.addView(rowsBar)
+        box.addView(smallLabel(getString(R.string.pin_cols), theme))
+        box.addView(colsBar)
+
+        AlertDialog.Builder(this)
+            .setTitle(R.string.pinned_grid)
+            .setView(box)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                Look.setPinnedRows(this, rowsBar.progress + 1)
+                Look.setPinnedCols(this, colsBar.progress + 1)
+                Toast.makeText(this, R.string.bubble_saved, Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun showPinnedPicker() {
         val apps = AppRepository.loadApps(this)
         if (apps.isEmpty()) return
         val store = PinnedApps(this)
+        val capacity = Look.pinnedCapacity(this)
         val pinned = store.all().toSet()
         val labels = apps.map { it.label }.toTypedArray()
         val checked = BooleanArray(apps.size) {
@@ -216,11 +298,11 @@ class SettingsActivity : Activity() {
             .setTitle(R.string.pinned_pick)
             .setMultiChoiceItems(labels, checked) { dialog, which, isChecked ->
                 checked[which] = isChecked
-                if (isChecked && checked.count { it } > PinnedApps.MAX) {
+                if (isChecked && checked.count { it } > capacity) {
                     checked[which] = false
                     (dialog as? AlertDialog)?.listView?.setItemChecked(which, false)
                     Toast.makeText(
-                        this, getString(R.string.pinned_full, PinnedApps.MAX), Toast.LENGTH_SHORT
+                        this, getString(R.string.pinned_full, capacity), Toast.LENGTH_SHORT
                     ).show()
                 }
             }
@@ -234,6 +316,16 @@ class SettingsActivity : Activity() {
             .setNegativeButton(android.R.string.cancel, null)
             .show()
     }
+
+    private fun smallLabel(label: String, theme: Theme): TextView = TextView(this).apply {
+        setText(label)
+        setTextColor(theme.textSecondary)
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+        typeface = Typeface.MONOSPACE
+        setPadding(0, dp(14), 0, 0)
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     // ------------------------------------------------- payment & government apps
     private fun showSensitiveDialog() {
