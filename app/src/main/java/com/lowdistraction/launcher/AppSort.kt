@@ -92,7 +92,12 @@ object SortPrefs {
  */
 object AppSorter {
 
-    fun sort(context: Context, apps: List<AppInfo>, mode: SortMode): List<AppInfo> {
+    fun sort(
+        context: Context,
+        apps: List<AppInfo>,
+        mode: SortMode,
+        sizes: Map<String, Long> = emptyMap()
+    ): List<AppInfo> {
         val byName = byLabel()
         return when (mode) {
             SortMode.NAME -> apps.sortedWith(byName)
@@ -126,16 +131,12 @@ object AppSorter {
                 val totals = foregroundTotals(context)
                 apps.sortedWith(compareBy<AppInfo> { totals[it.packageName] ?: 0L }.then(byName))
             }
-            SortMode.LARGEST -> {
-                val sizes = sizesFor(context, apps)
-                apps.sortedWith(
-                    compareByDescending<AppInfo> { sizes[it.packageName] ?: 0L }.then(byName)
-                )
-            }
-            SortMode.SMALLEST -> {
-                val sizes = sizesFor(context, apps)
-                apps.sortedWith(compareBy<AppInfo> { sizes[it.packageName] ?: 0L }.then(byName))
-            }
+            SortMode.LARGEST -> apps.sortedWith(
+                compareByDescending<AppInfo> { sizes[it.packageName] ?: 0L }.then(byName)
+            )
+            SortMode.SMALLEST -> apps.sortedWith(
+                compareBy<AppInfo> { sizes[it.packageName] ?: 0L }.then(byName)
+            )
             SortMode.SHORTEST_NAME ->
                 apps.sortedWith(compareBy<AppInfo> { it.label.length }.then(byName))
             SortMode.LONGEST_NAME ->
@@ -170,19 +171,37 @@ object AppSorter {
         mode == AppOpsManager.MODE_ALLOWED
     }.getOrDefault(false)
 
-    /** Foreground time per package over the last month, or empty without access. */
-    private fun foregroundTotals(context: Context): Map<String, Long> = runCatching {
-        if (!hasUsageAccess(context)) return emptyMap()
-        val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-        val end = System.currentTimeMillis()
-        val start = end - 30L * 24 * 60 * 60 * 1000
-        usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, start, end)
-            .groupBy { it.packageName }
-            .mapValues { (_, stats) -> stats.sumOf { it.totalTimeInForeground } }
-    }.getOrDefault(emptyMap())
+    /** Foreground time per package over the last month, cached for a minute. */
+    @Volatile
+    private var totalsCache: Pair<Long, Map<String, Long>>? = null
 
-    /** Installed size per package for just the apps on screen, or empty without access. */
-    private fun sizesFor(context: Context, apps: List<AppInfo>): Map<String, Long> = runCatching {
+    private fun foregroundTotals(context: Context): Map<String, Long> {
+        val now = System.currentTimeMillis()
+        totalsCache?.let { (at, totals) ->
+            if (now - at < 60_000L) return totals
+        }
+        val fresh = runCatching {
+            if (!hasUsageAccess(context)) return emptyMap()
+            val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+            val end = System.currentTimeMillis()
+            val start = end - 30L * 24 * 60 * 60 * 1000
+            usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, start, end)
+                .groupBy { it.packageName }
+                .mapValues { (_, stats) -> stats.sumOf { it.totalTimeInForeground } }
+        }.getOrDefault(emptyMap())
+        totalsCache = now to fresh
+        return fresh
+    }
+
+    /**
+     * Installed size per package, for the given apps.
+     *
+     * The system asks for this on a worker thread — it may take seconds across a
+     * whole phone — so the caller runs it off the UI thread and caches the result.
+     * Without Usage access it returns nothing and the size orders fall back to the
+     * name order.
+     */
+    fun loadSizes(context: Context, apps: List<AppInfo>): Map<String, Long> = runCatching {
         if (!hasUsageAccess(context)) return emptyMap()
         val storage = context.getSystemService(Context.STORAGE_STATS_SERVICE) as StorageStatsManager
         val out = HashMap<String, Long>()
@@ -191,7 +210,7 @@ object AppSorter {
                 context.packageManager.getApplicationInfo(app.packageName, 0).uid
             }.getOrNull() ?: continue
             val bytes = runCatching {
-                storage.getAppBytes(StorageManager.UUID_DEFAULT, uid)
+                storage.queryStatsForUid(StorageManager.UUID_DEFAULT, uid).appBytes
             }.getOrNull() ?: continue
             out[app.packageName] = bytes
         }

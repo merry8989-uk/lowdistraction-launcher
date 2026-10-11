@@ -67,6 +67,10 @@ class MainActivity : Activity() {
     private var allApps: List<AppInfo> = emptyList()
     private var currentResults: List<AppInfo> = emptyList()
 
+    // Sizes for the two size orders; filled in on a worker thread when needed.
+    private var appSizes: Map<String, Long> = emptyMap()
+    private var sizesAttempted = false
+
     private val autoOpenHandler = Handler(Looper.getMainLooper())
     private val quickHandler = Handler(Looper.getMainLooper())
     private var quickToken = 0
@@ -401,6 +405,9 @@ class MainActivity : Activity() {
             val apps = AppRepository.loadApps(this)
             runOnUiThread {
                 allApps = apps
+                // A fresh app list may include new apps, so sizes are re-read.
+                appSizes = emptyMap()
+                sizesAttempted = false
                 if (quickFind.text.isNullOrEmpty()) filter(search.text?.toString().orEmpty())
                 renderPinned()
             }
@@ -419,7 +426,8 @@ class MainActivity : Activity() {
         } else {
             visible.filter { it.label.lowercase().contains(q) }
         }
-        val filtered = AppSorter.sort(this, matched, SortPrefs.mode(this))
+        val filtered = AppSorter.sort(this, matched, SortPrefs.mode(this), appSizes)
+        ensureSizes()
 
         currentResults = filtered
         appAdapter.submit(filtered)
@@ -607,6 +615,29 @@ class MainActivity : Activity() {
     }
 
     // -------------------------------------------------------------- sorting
+    /**
+     * App sizes are asked of the system, which is slow, so they are fetched off
+     * the UI thread the first time a size order is used and then kept.
+     */
+    private fun ensureSizes() {
+        val mode = SortPrefs.mode(this)
+        if (mode != SortMode.LARGEST && mode != SortMode.SMALLEST) return
+        // Only ever tried once per app-list load, so this cannot loop.
+        if (sizesAttempted) return
+        sizesAttempted = true
+        Thread {
+            val sizes = AppSorter.loadSizes(this, allApps)
+            runOnUiThread {
+                appSizes = sizes
+                if (SortPrefs.mode(this) == SortMode.LARGEST ||
+                    SortPrefs.mode(this) == SortMode.SMALLEST
+                ) {
+                    filter(search.text?.toString().orEmpty())
+                }
+            }
+        }.start()
+    }
+
     private fun updateSortChip() {
         sortChip.text = getString(R.string.sort_chip, getString(sortLabel(SortPrefs.mode(this))))
     }
