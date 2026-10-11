@@ -1,0 +1,9 @@
+A breather before apps, a bigger pinned grid, and double-tap to lock
+
+- Opening an app now shows a seven-second pause first: "Do you really need this
+  right now?" Let the count run out and the app opens; tap anywhere, or press
+  back, and it is cancelled. There is a switch in Settings if you would rather
+  not have it.
+- Pinned apps go up to eight, laid out two across and four down.
+- Double-tap the home screen - in the same place a long-press opens Settings -
+  to lock the screen.

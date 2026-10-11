@@ -123,6 +123,13 @@ class SettingsActivity : Activity() {
             SensitiveApps.setStrict(this, isChecked)
         }
 
+        val pause = findViewById<Switch>(R.id.pause_switch)
+        pause.setOnCheckedChangeListener(null)
+        pause.isChecked = ShortcutPrefs.isLaunchPauseEnabled(this)
+        pause.setOnCheckedChangeListener { _, isChecked ->
+            ShortcutPrefs.setLaunchPauseEnabled(this, isChecked)
+        }
+
         findViewById<TextView>(R.id.wheelSoundDesc).text = WheelSound.selected(this).name
     }
 

@@ -325,6 +325,44 @@
         </LinearLayout>
 
         <LinearLayout
+            android:id="@+id/row_pause"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:paddingTop="14dp"
+                android:paddingBottom="14dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/settings_row_pause"
+                    android:textColor="@color/textPrimary"
+                    android:textSize="17sp"
+                    android:fontFamily="monospace" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/settings_pause_desc"
+                    android:textColor="@color/textSecondary"
+                    android:textSize="12sp"
+                    android:fontFamily="monospace" />
+            </LinearLayout>
+
+            <Switch
+                android:id="@+id/pause_switch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
+
+        <LinearLayout
             android:id="@+id/row_pinned"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

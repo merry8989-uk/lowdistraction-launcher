@@ -2,7 +2,7 @@ package com.lowdistraction.launcher
 
 import android.content.Context
 
-/** Up to four apps shown in their own emphasised row on the home screen. */
+/** Up to eight apps shown in their own emphasised grid on the home screen. */
 class PinnedApps(context: Context) {
 
     private val prefs = context.getSharedPreferences("pinned_apps", Context.MODE_PRIVATE)
@@ -29,7 +29,7 @@ class PinnedApps(context: Context) {
         prefs.edit().putString(KEY, list.joinToString("\n")).apply()
 
     companion object {
-        const val MAX = 4
+        const val MAX = 8
         private const val KEY = "components"
     }
 }

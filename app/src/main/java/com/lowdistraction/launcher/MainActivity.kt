@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
@@ -21,8 +22,10 @@ import android.text.TextWatcher
 import android.util.TypedValue
 import android.view.GestureDetector
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.ImageView
@@ -67,6 +70,14 @@ class MainActivity : Activity() {
     private val quickHandler = Handler(Looper.getMainLooper())
     private var quickToken = 0
 
+    // The seven-second breather shown before an app opens
+    private val gateHandler = Handler(Looper.getMainLooper())
+    private var gateDialog: AlertDialog? = null
+    private var gateRunnable: Runnable? = null
+    private var gateApp: AppInfo? = null
+    private var gateFinished = false
+    private var lastLockAt = 0L
+
     // Slow background drift
     private lateinit var theme: Theme
     private var bgDrawable: GradientDrawable? = null
@@ -88,7 +99,7 @@ class MainActivity : Activity() {
         devCheckBadge.setOnLongClickListener { openSettings(); true }
 
         appAdapter = AppListAdapter(
-            onLaunch = { launch(it) },
+            onLaunch = { requestLaunch(it) },
             onLongPress = { app, view -> showAppMenu(app, view) }
         )
         theme = Look.theme(this)
@@ -102,6 +113,9 @@ class MainActivity : Activity() {
         // Long-press anywhere on the home screen opens Settings.
         findViewById<View>(R.id.header).setOnLongClickListener { openSettings(); true }
         findViewById<View>(R.id.root).setOnLongClickListener { openSettings(); true }
+        // Long-press opens Settings; a double-tap in the same places locks the screen.
+        attachDoubleTap(findViewById(R.id.header))
+        attachDoubleTap(findViewById(R.id.root))
 
         search.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -201,8 +215,9 @@ class MainActivity : Activity() {
     }
 
     /**
-     * The pinned apps get their own row above the list: always bold — heavier
-     * than anything else on screen — and half again the chosen text size.
+     * The pinned apps get their own grid above the list: two columns, four rows
+     * at most, always bold — heavier than anything else on screen — and half
+     * again the chosen text size.
      */
     private fun renderPinned() {
         if (!::theme.isInitialized) theme = Look.theme(this)
@@ -221,54 +236,68 @@ class MainActivity : Activity() {
         divider.visibility = View.VISIBLE
         divider.setBackgroundColor(Look.blend(theme.bg, theme.textSecondary, 0.35f))
 
-        val mode = Look.displayMode(this)
-        val density = resources.displayMetrics.density
-        val iconPx = (Look.iconSize(this) * PINNED_SCALE * density).toInt()
-
-        for (app in apps) {
-            val row = layoutInflater.inflate(R.layout.item_app, box, false) as LinearLayout
-            val icon = row.findViewById<ImageView>(R.id.appIcon)
-            val label = row.findViewById<TextView>(R.id.appLabel)
-
-            label.text = app.label
-            label.setTextSize(TypedValue.COMPLEX_UNIT_SP, Look.nameSize(this) * PINNED_SCALE)
-            label.setTypeface(Typeface.MONOSPACE, Typeface.BOLD)
-            label.paint.isFakeBoldText = true
-            label.letterSpacing = Look.nameSpacing(this) / 100f
-            label.setTextColor(theme.textPrimary)
-
-            if (mode == DisplayMode.NAME) {
-                icon.visibility = View.GONE
-            } else {
-                icon.visibility = View.VISIBLE
-                val lp = icon.layoutParams as LinearLayout.LayoutParams
-                lp.width = iconPx
-                lp.height = iconPx
-                icon.layoutParams = lp
-                val labelLp = label.layoutParams as LinearLayout.LayoutParams
-                labelLp.marginStart = dp(14)
-                label.layoutParams = labelLp
-                runCatching { packageManager.getApplicationIcon(app.packageName) }
-                    .getOrNull()
-                    ?.let { base ->
-                        icon.setImageDrawable(
-                            ShapedIconDrawable(
-                                base,
-                                Look.iconShape(this),
-                                Look.iconOutline(this) * density,
-                                theme.accent
-                            )
-                        )
-                    }
+        for (pair in apps.chunked(PINNED_COLUMNS)) {
+            val line = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            for (app in pair) {
+                line.addView(
+                    pinnedCell(app),
+                    LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                )
             }
-
-            row.setOnClickListener { launch(app) }
-            row.setOnLongClickListener { view ->
-                showAppMenu(app, view)
-                true
+            // Keep the columns aligned when the last row is half full.
+            repeat(PINNED_COLUMNS - pair.size) {
+                line.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
             }
-            box.addView(row)
+            box.addView(line)
         }
+    }
+
+    /** One pinned cell: bold, 1.5x, carrying the display mode's icon. */
+    private fun pinnedCell(app: AppInfo): LinearLayout {
+        val cell = layoutInflater.inflate(R.layout.item_app, null, false) as LinearLayout
+        val icon = cell.findViewById<ImageView>(R.id.appIcon)
+        val label = cell.findViewById<TextView>(R.id.appLabel)
+
+        label.text = app.label
+        label.setTextSize(TypedValue.COMPLEX_UNIT_SP, Look.nameSize(this) * PINNED_SCALE)
+        label.setTypeface(Typeface.MONOSPACE, Typeface.BOLD)
+        label.paint.isFakeBoldText = true
+        label.letterSpacing = Look.nameSpacing(this) / 100f
+        label.setTextColor(theme.textPrimary)
+
+        if (Look.displayMode(this) == DisplayMode.NAME) {
+            icon.visibility = View.GONE
+        } else {
+            val density = resources.displayMetrics.density
+            val iconPx = (Look.iconSize(this) * PINNED_SCALE * density).toInt()
+            icon.visibility = View.VISIBLE
+            val lp = icon.layoutParams as LinearLayout.LayoutParams
+            lp.width = iconPx
+            lp.height = iconPx
+            icon.layoutParams = lp
+            val labelLp = label.layoutParams as LinearLayout.LayoutParams
+            labelLp.marginStart = dp(10)
+            label.layoutParams = labelLp
+            runCatching { packageManager.getApplicationIcon(app.packageName) }
+                .getOrNull()
+                ?.let { base ->
+                    icon.setImageDrawable(
+                        ShapedIconDrawable(
+                            base,
+                            Look.iconShape(this),
+                            Look.iconOutline(this) * density,
+                            theme.accent
+                        )
+                    )
+                }
+        }
+
+        cell.setOnClickListener { requestLaunch(app) }
+        cell.setOnLongClickListener { view ->
+            showAppMenu(app, view)
+            true
+        }
+        return cell
     }
 
     private fun rounded(fill: Int, radiusDp: Int, stroke: Int? = null): GradientDrawable =
@@ -291,6 +320,7 @@ class MainActivity : Activity() {
         super.onPause()
         autoOpenHandler.removeCallbacksAndMessages(null)
         quickHandler.removeCallbacksAndMessages(null)
+        cancelGate()
         stopBackgroundDrift()
     }
 
@@ -385,7 +415,7 @@ class MainActivity : Activity() {
 
         if (q.isNotEmpty() && filtered.size == 1) {
             val target = filtered.first()
-            autoOpenHandler.postDelayed({ launch(target) }, AUTO_OPEN_DELAY_MS)
+            autoOpenHandler.postDelayed({ requestLaunch(target) }, AUTO_OPEN_DELAY_MS)
         }
     }
 
@@ -396,11 +426,172 @@ class MainActivity : Activity() {
         if (submitted) {
             currentResults.firstOrNull()?.let { app ->
                 autoOpenHandler.removeCallbacksAndMessages(null)
-                launch(app)
+                requestLaunch(app)
                 return true
             }
         }
         return false
+    }
+
+    /**
+     * Every app opening goes through here: a seven-second breather first, which
+     * opens the app if it runs out and cancels if the user taps anywhere.
+     */
+    private fun requestLaunch(app: AppInfo) {
+        if (!ShortcutPrefs.isLaunchPauseEnabled(this)) {
+            launch(app)
+            return
+        }
+        cancelGate()
+        gateFinished = false
+        gateApp = app
+
+        val density = resources.displayMetrics.density
+        fun px(value: Int) = (value * density).toInt()
+
+        val counter = TextView(this).apply {
+            text = PAUSE_SECONDS.toString()
+            setTextColor(theme.textPrimary)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 52f)
+            typeface = Typeface.MONOSPACE
+            setTypeface(typeface, Typeface.BOLD)
+            gravity = Gravity.CENTER
+            setPadding(0, px(22), 0, 0)
+        }
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(px(28), px(28), px(28), px(28))
+            background = ColorDrawable(theme.bg)
+        }
+        box.addView(
+            TextView(this).apply {
+                text = app.label
+                setTextColor(theme.accent)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+                typeface = Typeface.MONOSPACE
+                gravity = Gravity.CENTER
+            }
+        )
+        box.addView(
+            TextView(this).apply {
+                text = getString(R.string.pause_question)
+                setTextColor(theme.textPrimary)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
+                typeface = Typeface.MONOSPACE
+                gravity = Gravity.CENTER
+                setPadding(0, px(16), 0, 0)
+            }
+        )
+        box.addView(
+            TextView(this).apply {
+                text = getString(R.string.pause_sub)
+                setTextColor(theme.textSecondary)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+                typeface = Typeface.MONOSPACE
+                gravity = Gravity.CENTER
+                setPadding(0, px(10), 0, 0)
+            }
+        )
+        box.addView(counter)
+        box.addView(
+            TextView(this).apply {
+                text = getString(R.string.pause_cancel_hint)
+                setTextColor(theme.textSecondary)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                typeface = Typeface.MONOSPACE
+                gravity = Gravity.CENTER
+                setPadding(0, px(14), 0, 0)
+            }
+        )
+
+        val dialog = AlertDialog.Builder(this)
+            .setView(box)
+            .setCancelable(false)
+            .create()
+        gateDialog = dialog
+
+        var remaining = PAUSE_SECONDS
+        val tick = object : Runnable {
+            override fun run() {
+                if (gateFinished) return
+                remaining--
+                if (remaining <= 0) {
+                    val target = gateApp
+                    cancelGate()
+                    if (target != null) launch(target)
+                    return
+                }
+                counter.text = remaining.toString()
+                gateHandler.postDelayed(this, 1000L)
+            }
+        }
+        gateRunnable = tick
+
+        box.setOnClickListener {
+            if (gateFinished) return@setOnClickListener
+            val target = gateApp
+            cancelGate()
+            if (target != null) announceCancel(target)
+        }
+        dialog.setOnKeyListener { _, keyCode, event ->
+            if (keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP &&
+                !gateFinished
+            ) {
+                val target = gateApp
+                cancelGate()
+                if (target != null) announceCancel(target)
+                true
+            } else {
+                false
+            }
+        }
+
+        dialog.show()
+        dialog.window?.setLayout(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT
+        )
+        dialog.window?.setBackgroundDrawable(ColorDrawable(theme.bg))
+        gateHandler.postDelayed(tick, 1000L)
+    }
+
+    private fun announceCancel(app: AppInfo) {
+        Toast.makeText(this, getString(R.string.pause_cancelled, app.label), Toast.LENGTH_SHORT)
+            .show()
+    }
+
+    private fun cancelGate() {
+        gateFinished = true
+        gateRunnable?.let { gateHandler.removeCallbacks(it) }
+        gateRunnable = null
+        gateDialog?.let { runCatching { it.dismiss() } }
+        gateDialog = null
+    }
+
+    /** Locks the device through the accessibility service. */
+    private fun lockScreen() {
+        val now = SystemClock.uptimeMillis()
+        if (now - lastLockAt < LOCK_DEBOUNCE_MS) return
+        lastLockAt = now
+        if (AssistiveTouchService.lock()) return
+        Toast.makeText(this, R.string.lock_needs_accessibility, Toast.LENGTH_SHORT).show()
+    }
+
+    /** Double-tap anywhere on [view] locks the screen; taps and long-press still work. */
+    private fun attachDoubleTap(view: View) {
+        val detector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDown(e: MotionEvent): Boolean = true
+
+            override fun onDoubleTap(e: MotionEvent): Boolean {
+                lockScreen()
+                return true
+            }
+        })
+        view.setOnTouchListener { _, event ->
+            detector.onTouchEvent(event)
+            false
+        }
     }
 
     private fun launch(app: AppInfo) {
@@ -676,6 +867,15 @@ class MainActivity : Activity() {
                     openSettings()
                 }
             }
+
+            override fun onDoubleTap(e: MotionEvent): Boolean {
+                // Only on the empty space, so double-tapping an app row is not a lock.
+                if (list.findChildViewUnder(e.x, e.y) == null) {
+                    lockScreen()
+                    return true
+                }
+                return false
+            }
         })
 
         list.addOnItemTouchListener(object : RecyclerView.SimpleOnItemTouchListener() {
@@ -746,6 +946,11 @@ class MainActivity : Activity() {
         private const val INDEX_MAX_AGE_MS = 7L * 24 * 60 * 60 * 1000
         /** Pinned rows are drawn half again as large as the rest. */
         private const val PINNED_SCALE = 1.5f
+        /** Pinned apps sit in two columns, so four rows hold eight. */
+        private const val PINNED_COLUMNS = 2
+        /** The breather before an app opens. */
+        private const val PAUSE_SECONDS = 7
+        private const val LOCK_DEBOUNCE_MS = 600L
         /** Degrees per second for the background — a full cycle takes ~5 minutes. */
         private const val BG_HUE_SPEED = 1.6f
         /** ~12fps is plenty for a glow that moves this slowly. */

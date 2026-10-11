@@ -175,11 +175,20 @@
     <string name="settings_row_guide">How to use</string>
     <string name="settings_guide_desc">Replay the first-run guide</string>
     <string name="settings_row_pinned">Pinned apps</string>
-    <string name="settings_pinned_desc">Up to 4 apps in their own bold row at the top</string>
+    <string name="settings_pinned_desc">Up to 8 apps in their own bold grid at the top</string>
     <string name="pinned_pick">Pin apps</string>
     <string name="settings_row_wheel_sound">Wheel sound</string>
     <string name="wheel_sound_title">Wheel sound</string>
     <string name="wheel_sound_hint">Tap one to hear it. It plays as the wheel spins.</string>
+
+    <!-- Pause before opening -->
+    <string name="settings_row_pause">Pause before opening apps</string>
+    <string name="settings_pause_desc">A 7-second breather first — tap anywhere to cancel</string>
+    <string name="pause_question">Do you really need this right now?</string>
+    <string name="pause_sub">Or are you just here to burn some time?</string>
+    <string name="pause_cancel_hint">Tap anywhere to cancel · 7 seconds</string>
+    <string name="pause_cancelled">%1$s not opened</string>
+    <string name="lock_needs_accessibility">Turn on the accessibility service to lock the screen</string>
 
     <!-- First-run guide -->
     <string name="guide_step">Step %1$d of %2$d</string>

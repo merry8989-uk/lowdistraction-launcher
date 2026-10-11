@@ -8,6 +8,7 @@ object ShortcutPrefs {
     private const val PREFS = "launcher_prefs"
     private const val KEY_DEVCHECK = "devcheck_enabled"
     private const val KEY_GUIDE_SEEN = "guide_seen"
+    private const val KEY_LAUNCH_PAUSE = "launch_pause"
 
     fun isDevCheckEnabled(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -26,5 +27,15 @@ object ShortcutPrefs {
     fun setGuideSeen(context: Context, seen: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit().putBoolean(KEY_GUIDE_SEEN, seen).apply()
+    }
+
+    /** The seven-second breather shown before an app opens. */
+    fun isLaunchPauseEnabled(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean(KEY_LAUNCH_PAUSE, true)
+
+    fun setLaunchPauseEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putBoolean(KEY_LAUNCH_PAUSE, enabled).apply()
     }
 }
