@@ -24,6 +24,11 @@
     <string name="pinned_full">You can pin up to %1$d apps</string>
     <string name="hidden_apps">Hidden apps</string>
     <string name="no_hidden_apps">No hidden apps</string>
+    <string name="hidden_open">Open %1$s</string>
+    <string name="hidden_unhide">Unhide (back in the list)</string>
+    <string name="hidden_unhidden">%1$s is back in the list</string>
+    <string name="hidden_open_failed">Couldn\'t open %1$s</string>
+    <string name="saved">Saved</string>
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>

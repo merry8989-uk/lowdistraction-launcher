@@ -1,0 +1,8 @@
+Hidden apps can be opened again
+
+- Settings > Hidden apps: tapping a hidden app now asks what you want to do with
+  it - open it, or put it back in the list. Before, tapping it only unhid it and
+  said "Ring updated", which was wrong on both counts.
+- Opening a hidden app leaves it hidden, so it stays out of the home list.
+- The pinned grid and pinned-apps screens now say "Saved" instead of borrowing
+  the bubble ring's message.

@@ -165,30 +165,71 @@ class SettingsActivity : Activity() {
         }
     }
 
+    /**
+     * The hidden apps. Tapping one offers to open it — hiding only keeps it off
+     * the home list — or to put it back into the list.
+     */
     private fun showHiddenAppsDialog() {
-        val hiddenApps = HiddenApps(this)
-        val packages = hiddenApps.all().toList()
+        val packages = HiddenApps(this).all().sorted()
         if (packages.isEmpty()) {
             Toast.makeText(this, R.string.no_hidden_apps, Toast.LENGTH_SHORT).show()
             return
         }
 
-        val labels = packages.map { pkg ->
-            try {
-                packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
-            } catch (_: Exception) {
-                pkg
-            }
-        }.toTypedArray()
+        val labels = packages.map { labelOf(it) }.toTypedArray()
 
         AlertDialog.Builder(this)
             .setTitle(R.string.hidden_apps)
-            .setItems(labels) { _, which ->
-                hiddenApps.unhide(packages[which])
-                Toast.makeText(this, R.string.bubble_saved, Toast.LENGTH_SHORT).show()
+            .setItems(labels) { _, which -> showHiddenAppActions(packages[which]) }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    /** Open a hidden app, or bring it back into the list. */
+    private fun showHiddenAppActions(pkg: String) {
+        val label = labelOf(pkg)
+        val actions = arrayOf(
+            getString(R.string.hidden_open, label),
+            getString(R.string.hidden_unhide)
+        )
+        AlertDialog.Builder(this)
+            .setTitle(label)
+            .setItems(actions) { _, which ->
+                when (which) {
+                    0 -> openApp(pkg, label)
+                    1 -> {
+                        HiddenApps(this).unhide(pkg)
+                        Toast.makeText(
+                            this, getString(R.string.hidden_unhidden, label), Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
+    }
+
+    /** Starts a hidden app without changing whether it is hidden. */
+    private fun openApp(pkg: String, label: String) {
+        val intent = packageManager.getLaunchIntentForPackage(pkg)
+        if (intent == null) {
+            Toast.makeText(this, getString(R.string.hidden_open_failed, label), Toast.LENGTH_LONG)
+                .show()
+            return
+        }
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+            startActivity(intent)
+        } catch (_: Exception) {
+            Toast.makeText(this, getString(R.string.hidden_open_failed, label), Toast.LENGTH_LONG)
+                .show()
+        }
+    }
+
+    private fun labelOf(pkg: String): String = try {
+        packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
+    } catch (_: Exception) {
+        pkg
     }
 
     // ---------------------------------------------------------- wheel & pins
@@ -278,7 +319,7 @@ class SettingsActivity : Activity() {
             .setPositiveButton(android.R.string.ok) { _, _ ->
                 Look.setPinnedRows(this, rowsBar.progress + 1)
                 Look.setPinnedCols(this, colsBar.progress + 1)
-                Toast.makeText(this, R.string.bubble_saved, Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, R.string.saved, Toast.LENGTH_SHORT).show()
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
@@ -311,7 +352,7 @@ class SettingsActivity : Activity() {
                     apps.filterIndexed { index, _ -> checked[index] }
                         .map { it.component.flattenToString() }
                 )
-                Toast.makeText(this, R.string.bubble_saved, Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, R.string.saved, Toast.LENGTH_SHORT).show()
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
