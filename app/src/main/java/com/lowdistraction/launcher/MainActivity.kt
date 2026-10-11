@@ -612,20 +612,27 @@ class MainActivity : Activity() {
     }
 
     private fun showSortDialog() {
-        val modes = SortMode.entries
-        val labels = modes.map { getString(sortLabel(it)) }.toTypedArray()
+        val modes = SortPrefs.enabledModes(this)
+        val hasAccess = AppSorter.hasUsageAccess(this)
+        val labels = modes.map { mode ->
+            val name = getString(sortLabel(mode))
+            if (mode.needsUsageAccess && !hasAccess) "$name  (needs access)" else name
+        }.toTypedArray()
         AlertDialog.Builder(this)
             .setTitle(R.string.sort_title)
             .setSingleChoiceItems(labels, modes.indexOf(SortPrefs.mode(this))) { dialog, which ->
                 val mode = modes[which]
                 dialog.dismiss()
-                if (mode == SortMode.MOST_TIME && !AppSorter.hasUsageAccess(this)) {
+                if (mode.needsUsageAccess && !AppSorter.hasUsageAccess(this)) {
                     promptUsageAccess()
                     return@setSingleChoiceItems
                 }
                 SortPrefs.setMode(this, mode)
                 updateSortChip()
                 filter(search.text?.toString().orEmpty())
+            }
+            .setNeutralButton(R.string.settings_row_sorting) { _, _ ->
+                startActivity(Intent(this, SortSettingsActivity::class.java))
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
@@ -646,11 +653,21 @@ class MainActivity : Activity() {
     private fun sortLabel(mode: SortMode): Int = when (mode) {
         SortMode.NAME -> R.string.sort_name
         SortMode.NAME_DESC -> R.string.sort_name_desc
+        SortMode.PACKAGE -> R.string.sort_package
+        SortMode.PACKAGE_DESC -> R.string.sort_package_desc
         SortMode.INSTALLED -> R.string.sort_installed
+        SortMode.INSTALLED_OLDEST -> R.string.sort_installed_oldest
         SortMode.UPDATED -> R.string.sort_updated
         SortMode.MOST_OPENED -> R.string.sort_most_opened
+        SortMode.LEAST_OPENED -> R.string.sort_least_opened
         SortMode.RECENTLY_USED -> R.string.sort_recent
+        SortMode.LEAST_RECENTLY_USED -> R.string.sort_least_recent
         SortMode.MOST_TIME -> R.string.sort_most_time
+        SortMode.LEAST_TIME -> R.string.sort_least_time
+        SortMode.LARGEST -> R.string.sort_largest
+        SortMode.SMALLEST -> R.string.sort_smallest
+        SortMode.SHORTEST_NAME -> R.string.sort_shortest
+        SortMode.LONGEST_NAME -> R.string.sort_longest
     }
 
     private fun launch(app: AppInfo) {

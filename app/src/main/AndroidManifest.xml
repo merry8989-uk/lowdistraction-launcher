@@ -119,6 +119,12 @@
             android:theme="@style/Theme.LowDistraction" />
 
         <activity
+            android:name=".SortSettingsActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.LowDistraction" />
+
+        <activity
             android:name=".GuideActivity"
             android:exported="false"
             android:excludeFromRecents="true"

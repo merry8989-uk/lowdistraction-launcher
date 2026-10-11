@@ -179,6 +179,8 @@
     <string name="settings_sources_desc">What the second search box looks through</string>
     <string name="settings_row_guide">How to use</string>
     <string name="settings_guide_desc">Replay the first-run guide</string>
+    <string name="settings_row_sorting">Sorting</string>
+    <string name="settings_sorting_desc">Choose which sort orders the app list offers</string>
     <string name="settings_row_pinned">Pinned apps</string>
     <string name="settings_pinned_desc">A bold grid of your own apps — nothing is pinned until you say so</string>
     <string name="pinned_pick">Choose apps…</string>
@@ -205,14 +207,36 @@
     <string name="sort_chip">Sort: %1$s</string>
     <string name="sort_name">Name (A–Z)</string>
     <string name="sort_name_desc">Name (Z–A)</string>
+    <string name="sort_package">Package name (A–Z)</string>
+    <string name="sort_package_desc">Package name (Z–A)</string>
     <string name="sort_installed">Recently installed</string>
+    <string name="sort_installed_oldest">Oldest installed</string>
     <string name="sort_updated">Recently updated</string>
     <string name="sort_most_opened">Most opened</string>
+    <string name="sort_least_opened">Least opened</string>
     <string name="sort_recent">Recently used</string>
+    <string name="sort_least_recent">Least recently used</string>
     <string name="sort_most_time">Most time used</string>
+    <string name="sort_least_time">Least time used</string>
+    <string name="sort_largest">Largest apps first</string>
+    <string name="sort_smallest">Smallest apps first</string>
+    <string name="sort_shortest">Shortest names first</string>
+    <string name="sort_longest">Longest names first</string>
     <string name="sort_usage_title">Usage access needed</string>
-    <string name="sort_usage_message">Sorting by time used needs Usage access, which Android only grants from a system screen. The figures are read on this device and never leave it.</string>
+    <string name="sort_usage_message">This order reads the system\'s own figures for time used and app size, which Android only shares once you grant Usage access from a system screen. Nothing is sent anywhere — it is all read on this device.</string>
     <string name="sort_usage_ok">Open usage access</string>
+
+    <string name="sort_settings_title">Sorting</string>
+    <string name="sort_settings_intro">Switch on the orders you want offered. The sort control above the search box shows only the ones you keep on.</string>
+    <string name="sort_settings_section">SORTING METHODS</string>
+    <string name="sort_settings_usage_section">USAGE ACCESS</string>
+    <string name="sort_always_works">always works</string>
+    <string name="sort_needs_usage">needs Usage access — falls back to the name order until then</string>
+    <string name="sort_needs_usage_ok">Usage access is on — ready</string>
+    <string name="sort_usage_row">Usage access</string>
+    <string name="sort_usage_on">granted</string>
+    <string name="sort_usage_off">not granted</string>
+    <string name="sort_usage_desc">Most and least time used, and largest and smallest apps, read the system\'s figures and need Usage access. Everything else works with no permission at all. The open counts and last-used times are the launcher\'s own tally, kept on this device only.</string>
 
     <!-- First-run guide -->
     <string name="guide_step">Step %1$d of %2$d</string>

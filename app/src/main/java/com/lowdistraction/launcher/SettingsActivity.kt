@@ -60,6 +60,10 @@ class SettingsActivity : Activity() {
 
         findViewById<View>(R.id.row_pinned).setOnClickListener { showPinnedDialog() }
 
+        findViewById<View>(R.id.row_sorting).setOnClickListener {
+            startActivity(Intent(this, SortSettingsActivity::class.java))
+        }
+
         findViewById<View>(R.id.row_wheel_sound).setOnClickListener { showWheelSoundDialog() }
 
         findViewById<View>(R.id.row_guide).setOnClickListener {

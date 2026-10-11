@@ -1,0 +1,12 @@
+Sorting gets its own settings, and 17 sort orders
+
+- New Sorting screen in Settings: switch each sort order on or off, so the sort
+  control only offers what you actually want.
+- The list of orders is now: name A-Z and Z-A, package name A-Z and Z-A,
+  recently installed, oldest installed, recently updated, most opened, least
+  opened, recently used, least recently used, most time used, least time used,
+  largest apps, smallest apps, shortest names and longest names.
+- Thirteen of them work with no permission at all. The four that read the
+  system's figures - most/least time used and largest/smallest apps - say
+  plainly that they need Usage access, and fall back to the name order until it
+  is granted rather than quietly doing nothing.
