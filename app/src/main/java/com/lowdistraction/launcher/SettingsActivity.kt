@@ -16,7 +16,7 @@ import com.lowdistraction.launcher.bubble.FloatingBubbleService
 /**
  * The launcher's settings screen. Opened by long-pressing anywhere on the
  * home screen. Owns the assistive-bubble switch, the payment/government-app
- * privacy controls, the folder search and the contact link.
+ * privacy controls, the search sources, the guide and the contact link.
  */
 class SettingsActivity : Activity() {
 
@@ -50,6 +50,14 @@ class SettingsActivity : Activity() {
             if (!HomeRole.openHomeSettings(this)) HomeRole.request(this)
         }
 
+        findViewById<View>(R.id.row_sources).setOnClickListener {
+            startActivity(Intent(this, SearchSourcesActivity::class.java))
+        }
+
+        findViewById<View>(R.id.row_guide).setOnClickListener {
+            startActivity(Intent(this, GuideActivity::class.java))
+        }
+
         findViewById<View>(R.id.row_contact).setOnClickListener { openInstagram() }
 
         findViewById<View>(R.id.row_updates).setOnClickListener { openReleases() }
@@ -57,7 +65,6 @@ class SettingsActivity : Activity() {
             getString(R.string.settings_updates_desc, appVersion())
 
         findViewById<View>(R.id.row_sensitive_manage).setOnClickListener { showSensitiveDialog() }
-        findViewById<View>(R.id.row_files).setOnClickListener { showFilesDialog() }
         findViewById<View>(R.id.row_appearance).setOnClickListener {
             startActivity(Intent(this, AppearanceActivity::class.java))
         }
@@ -111,8 +118,6 @@ class SettingsActivity : Activity() {
         strict.setOnCheckedChangeListener { _, isChecked ->
             SensitiveApps.setStrict(this, isChecked)
         }
-
-        updateFilesDesc()
     }
 
     private fun enableBubble() {
@@ -256,102 +261,5 @@ class SettingsActivity : Activity() {
             .setMessage(text)
             .setPositiveButton(android.R.string.ok, null)
             .show()
-    }
-
-    // ------------------------------------------------------------- file search
-    private fun showFilesDialog() {
-        val roots = FileIndex.roots(this)
-        val items = ArrayList<String>()
-        val actions = ArrayList<() -> Unit>()
-
-        items += getString(R.string.files_add)
-        actions += { pickFolder() }
-
-        if (roots.isNotEmpty()) {
-            items += getString(R.string.files_rebuild)
-            actions += { rebuildIndex() }
-        }
-
-        for (root in roots) {
-            items += getString(R.string.files_remove, folderLabel(root))
-            actions += {
-                runCatching {
-                    contentResolver.releasePersistableUriPermission(
-                        root, Intent.FLAG_GRANT_READ_URI_PERMISSION
-                    )
-                }
-                FileIndex.removeRoot(this, root)
-                showFilesDialog()
-            }
-        }
-
-        if (roots.isEmpty()) {
-            items += getString(R.string.files_none)
-            actions += {}
-        }
-
-        AlertDialog.Builder(this)
-            .setTitle(R.string.settings_row_files)
-            .setItems(items.toTypedArray()) { _, which -> actions[which].invoke() }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
-    }
-
-    private fun folderLabel(uri: Uri): String =
-        runCatching { Uri.decode(uri.lastPathSegment ?: uri.toString()) }
-            .getOrDefault(uri.toString())
-
-    private fun pickFolder() {
-        startActivityForResult(
-            Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(
-                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
-            ),
-            REQ_FOLDER
-        )
-    }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == REQ_FOLDER && resultCode == RESULT_OK) {
-            val uri = data?.data ?: return
-            runCatching {
-                contentResolver.takePersistableUriPermission(
-                    uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
-            }
-            FileIndex.addRoot(this, uri)
-            rebuildIndex()
-        }
-    }
-
-    private fun rebuildIndex() {
-        Toast.makeText(this, R.string.files_indexing, Toast.LENGTH_SHORT).show()
-        Thread {
-            runCatching { FileIndex.rebuild(this) }
-            val count = runCatching { FileIndex.count(this) }.getOrDefault(0)
-            runOnUiThread {
-                Toast.makeText(
-                    this, getString(R.string.files_rebuild_done, count), Toast.LENGTH_LONG
-                ).show()
-                updateFilesDesc()
-            }
-        }.start()
-    }
-
-    private fun updateFilesDesc() {
-        val desc = findViewById<TextView>(R.id.filesDesc)
-        if (!FileIndex.isEnabled(this)) {
-            desc.text = getString(R.string.files_none)
-            return
-        }
-        Thread {
-            val roots = FileIndex.roots(this).size
-            val count = runCatching { FileIndex.count(this) }.getOrDefault(0)
-            runOnUiThread { desc.text = getString(R.string.files_desc, roots, count) }
-        }.start()
-    }
-
-    companion object {
-        private const val REQ_FOLDER = 902
     }
 }

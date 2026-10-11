@@ -120,7 +120,12 @@ class MainActivity : Activity() {
             showAppPicker()
         }
 
-        maybePromptDefaultLauncher()
+        if (ShortcutPrefs.isGuideSeen(this)) {
+            maybePromptDefaultLauncher()
+        } else {
+            // First run: show the guide before anything else.
+            startActivity(Intent(this, GuideActivity::class.java))
+        }
         loadApps()
     }
 
@@ -167,6 +172,7 @@ class MainActivity : Activity() {
             LinearLayoutManager(this)
         }
         appAdapter.refreshLook(this)
+        applyQuickFindVisibility()
 
         // Rebuild the background with the new palette and restart the drift.
         bgDrawable = null
@@ -178,6 +184,14 @@ class MainActivity : Activity() {
         val controller = WindowCompat.getInsetsController(window, window.decorView)
         controller.isAppearanceLightStatusBars = theme.light
         controller.isAppearanceLightNavigationBars = theme.light
+    }
+
+    /** The second box exists only while at least one source is switched on. */
+    private fun applyQuickFindVisibility() {
+        val on = SearchSources.anyEnabled(this)
+        quickFind.visibility = if (on) View.VISIBLE else View.GONE
+        if (!on && !quickFind.text.isNullOrEmpty()) quickFind.setText("")
+        quickFind.hint = SearchSources.hint(this)
     }
 
     private fun rounded(fill: Int, radiusDp: Int, stroke: Int? = null): GradientDrawable =
@@ -334,7 +348,7 @@ class MainActivity : Activity() {
         val token = ++quickToken
         val q = query
         Thread {
-            val results = QuickFind.search(this, q, ShortcutPrefs.isDevCheckEnabled(this))
+            val results = QuickFind.search(this, q)
             runOnUiThread {
                 if (token != quickToken) return@runOnUiThread
                 quickAdapter.submit(results)
@@ -428,10 +442,14 @@ class MainActivity : Activity() {
 
     private fun requestQuickPermissions() {
         val missing = ArrayList<String>()
-        if (checkSelfPermission(Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+        if (SearchSources.contacts(this) &&
+            checkSelfPermission(Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED
+        ) {
             missing.add(Manifest.permission.READ_CONTACTS)
         }
-        if (checkSelfPermission(Manifest.permission.READ_CALENDAR) != PackageManager.PERMISSION_GRANTED) {
+        if (SearchSources.calendar(this) &&
+            checkSelfPermission(Manifest.permission.READ_CALENDAR) != PackageManager.PERMISSION_GRANTED
+        ) {
             missing.add(Manifest.permission.READ_CALENDAR)
         }
         if (missing.isNotEmpty()) {
@@ -617,7 +635,7 @@ class MainActivity : Activity() {
 
     @Deprecated("Launcher home; back should not exit the app list")
     override fun onBackPressed() {
-        if (quickFind.text.isNotEmpty()) {
+        if (quickFind.visibility == View.VISIBLE && quickFind.text.isNotEmpty()) {
             quickFind.setText("")
         } else if (search.text.isNotEmpty()) {
             search.setText("")

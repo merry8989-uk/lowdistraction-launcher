@@ -127,6 +127,81 @@
     <string name="contact_instagram_url" translatable="false">https://instagram.com/osintgram_io</string>
     <string name="settings_no_trackers">This app has no analytics and no trackers. The link above is just a plain web link you can tap — nothing is sent anywhere by the app itself.</string>
 
+    <!-- Search sources -->
+    <string name="source_short_settings">Settings</string>
+    <string name="source_short_contacts">Contacts</string>
+    <string name="source_short_calendar">Calendar</string>
+    <string name="source_short_files">Files</string>
+    <string name="source_short_devcheck">Dev.Check</string>
+
+    <string name="sources_title">Search sources</string>
+    <string name="sources_intro">Choose what the second search box looks for. With everything off, the box stays hidden.</string>
+    <string name="sources_section">LOOK THROUGH</string>
+    <string name="sources_settings">Settings shortcuts</string>
+    <string name="sources_settings_desc">Wi-Fi, Bluetooth, Display, Apps and the other settings pages</string>
+    <string name="sources_contacts">Contacts</string>
+    <string name="sources_contacts_desc">Names and numbers on this device</string>
+    <string name="sources_calendar">Calendar</string>
+    <string name="sources_calendar_desc">Upcoming events</string>
+    <string name="sources_files">Files</string>
+    <string name="sources_files_desc">Documents, media and folders on this device</string>
+    <string name="sources_devcheck">Dev.Check</string>
+    <string name="sources_devcheck_desc">Device-info shortcuts, if you use them</string>
+    <string name="sources_permission_contacts">Contacts</string>
+    <string name="sources_permission_calendar">Calendar</string>
+    <string name="sources_all_files">All files access</string>
+    <string name="sources_permission_holding">%1$s permission is on</string>
+    <string name="sources_permission_none">%1$s permission is off</string>
+    <string name="sources_remove_permission">Remove permission…</string>
+    <string name="sources_full_storage">All files access</string>
+    <string name="sources_full_storage_desc">Lets the app read the whole of storage, so file search needs no folder picking. Tap to open the system toggle.</string>
+    <string name="sources_granted">Granted</string>
+    <string name="sources_not_granted">Not granted</string>
+    <string name="sources_fallback_add">Add a folder instead</string>
+    <string name="sources_fallback_hint">Fallback</string>
+    <string name="sources_fallback_remove">Remove</string>
+    <string name="sources_rebuild">Rebuild index</string>
+    <string name="sources_indexed">%1$d items</string>
+    <string name="sources_contacts_off">Contacts search is off</string>
+    <string name="sources_footer">Turning a source off stops the app reading it straight away and clears whatever it had cached. The Remove permission button opens this app\'s page in system settings, where you can change the permission yourself.</string>
+
+    <string name="settings_row_sources">Search sources</string>
+    <string name="settings_sources_desc">What the second search box looks through</string>
+    <string name="settings_row_guide">How to use</string>
+    <string name="settings_guide_desc">Replay the first-run guide</string>
+
+    <!-- First-run guide -->
+    <string name="guide_step">Step %1$d of %2$d</string>
+    <string name="guide_skip">Skip</string>
+    <string name="guide_next">Next</string>
+    <string name="guide_back">Back</string>
+    <string name="guide_done">Done</string>
+    <string name="guide_hold">hold here</string>
+    <string name="guide_s1_title">Welcome</string>
+    <string name="guide_s1_body">Low Distraction is a home screen made of text: your apps, and little else. No icon clutter, no feeds, and no internet — the app cannot go online at all.</string>
+    <string name="guide_s2_title">Where Settings is</string>
+    <string name="guide_s2_body">Long-press anywhere on the home screen for about a second and Settings opens. Everything lives there: appearance, search sources, the assistive bubble, and this guide.</string>
+    <string name="guide_s3_title">The assistive wheel</string>
+    <string name="guide_s3_body">Turn the bubble on from Settings, then:\n\n1 tap — Back\n2 taps — Home\n3 taps — Lock\nLong-press — the wheel\n\nDrag the wheel to spin it and a soft chime plays as it turns. Tap a slot to open that app. The bottom row holds Torch, Volume, Do Not Disturb and Break.</string>
+    <string name="guide_test_chime">Test the chime</string>
+    <string name="guide_enable_wheel">Turn on the assistive wheel</string>
+    <string name="guide_s4_title">Themes</string>
+    <string name="guide_s4_body">Settings → Appearance holds over 60 themes, dark and light, plus a theme you can build from your own four colours. The same screen shows icons instead of names if you prefer, and sets icon shape, size, outline, text size and boldness.</string>
+    <string name="guide_open_appearance">Open Appearance</string>
+    <string name="guide_s5_title">The second search box</string>
+    <string name="guide_s5_body">By default there is one box and it searches apps. The second box is opt-in: open Search sources and switch on whatever you want it to look through — settings shortcuts, contacts, calendar or files. It appears as soon as one is on, and hides again when all are off.</string>
+    <string name="guide_open_sources">Open Search sources</string>
+    <string name="guide_s6_title">Taking permissions back</string>
+    <string name="guide_s6_body">Every source shows whether it holds a permission, with a Remove permission button beside it. That button opens this app\'s page in system settings, where you can change or remove permissions yourself. Switching a source off also stops the app reading it and clears anything cached.</string>
+    <string name="guide_s7_title">Searching inside files</string>
+    <string name="guide_s7_body">For Files, switch on All files access to search the whole of storage — documents, media, sub-folders — with no folder picking at all. If you would rather not grant that, add individual folders instead. Do neither and file search simply stays off.</string>
+    <string name="guide_s8_title">Make it your home screen</string>
+    <string name="guide_s8_body">Set Low Distraction as your default launcher and it becomes the home screen: press Home and you land here.</string>
+    <string name="guide_open_launcher">Open launcher settings</string>
+    <string name="guide_s9_title">That is everything</string>
+    <string name="guide_s9_body">It all lives in Settings — long-press the home screen any time. You can replay this guide from Settings → How to use.</string>
+    <string name="guide_open_settings">Open Settings</string>
+
     <!-- Assistive bubble -->
     <string name="bubble_channel_name">Assistive bubble</string>
     <string name="bubble_channel_description">Keeps the assistive touch bubble running.</string>

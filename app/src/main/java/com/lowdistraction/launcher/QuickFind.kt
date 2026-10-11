@@ -54,16 +54,16 @@ object QuickFind {
         Target("All settings", "settings all", Settings.ACTION_SETTINGS)
     )
 
-    fun search(context: Context, query: String, includeDevCheck: Boolean = false): List<QuickEntry> {
+    fun search(context: Context, query: String): List<QuickEntry> {
         val q = query.trim()
         if (q.isEmpty()) return emptyList()
 
         val out = ArrayList<QuickEntry>()
-        out += contactEntries(context, q)
-        out += calendarEntries(context, q)
-        out += fileEntries(context, q)
-        out += settingsEntries(q)
-        if (includeDevCheck) {
+        if (SearchSources.contacts(context)) out += contactEntries(context, q)
+        if (SearchSources.calendar(context)) out += calendarEntries(context, q)
+        if (SearchSources.files(context)) out += fileEntries(context, q)
+        if (SearchSources.settings(context)) out += settingsEntries(q)
+        if (SearchSources.devCheck(context)) {
             out += DevCheck.entries().filter { DevCheck.matches(it, q) }
         }
 
@@ -75,7 +75,6 @@ object QuickFind {
                     Intent(Intent.ACTION_SEARCH).putExtra(android.app.SearchManager.QUERY, q)
                 )
             )
-            out.add(QuickEntry("Open Settings", "All device settings", Intent(Settings.ACTION_SETTINGS)))
         }
         return out
     }
@@ -99,14 +98,7 @@ object QuickFind {
                         append(size)
                     }
                 }
-                QuickEntry(
-                    f.name,
-                    hint,
-                    Intent(Intent.ACTION_VIEW).apply {
-                        setDataAndType(Uri.parse(f.uri), f.mime.ifEmpty { "*/*" })
-                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    }
-                )
+                QuickEntry(f.name, hint, FileIndex.openIntent(context, f))
             }
         }
 

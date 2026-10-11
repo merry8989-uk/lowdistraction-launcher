@@ -299,7 +299,7 @@
         </LinearLayout>
 
         <LinearLayout
-            android:id="@+id/row_files"
+            android:id="@+id/row_sources"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:background="?android:attr/selectableItemBackground"
@@ -310,15 +310,16 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/settings_row_files"
+                android:text="@string/settings_row_sources"
                 android:textColor="@color/textPrimary"
                 android:textSize="17sp"
                 android:fontFamily="monospace" />
 
             <TextView
-                android:id="@+id/filesDesc"
+                android:id="@+id/sourcesDesc"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:text="@string/settings_sources_desc"
                 android:textColor="@color/textSecondary"
                 android:textSize="12sp"
                 android:fontFamily="monospace" />
@@ -345,6 +346,32 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/settings_appearance_desc"
+                android:textColor="@color/textSecondary"
+                android:textSize="12sp"
+                android:fontFamily="monospace" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/row_guide"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="?android:attr/selectableItemBackground"
+            android:orientation="vertical"
+            android:paddingTop="14dp"
+            android:paddingBottom="14dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/settings_row_guide"
+                android:textColor="@color/textPrimary"
+                android:textSize="17sp"
+                android:fontFamily="monospace" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/settings_guide_desc"
                 android:textColor="@color/textSecondary"
                 android:textSize="12sp"
                 android:fontFamily="monospace" />

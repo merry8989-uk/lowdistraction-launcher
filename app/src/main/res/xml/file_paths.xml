@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Paths the app may hand to another app when the user taps a file in a search
+  result. Read-only sharing; nothing here is ever written.
+-->
+<paths>
+    <external-path name="external" path="." />
+    <root-path name="root" path="." />
+</paths>

@@ -1,0 +1,15 @@
+Search sources, full-storage file search, and a first-run guide
+
+- New "Search sources" screen. Every source starts off, so a fresh install shows
+  only the app search box. Switch on what you want the second box to look
+  through: settings shortcuts, contacts, calendar or files. It appears as soon
+  as one is on, and hides again when all are off.
+- Files now searches the whole of storage with "All files access" - documents,
+  media and sub-folders - and the folder picker is gone. Prefer not to grant
+  that? Add individual folders instead. Do neither and file search stays off.
+- Each source shows whether it holds a permission, with a Remove permission
+  button that opens this app's page in system settings. Switching a source off
+  also stops the app reading it and clears whatever it had cached.
+- New first-run guide: where Settings is, the assistive wheel (with a chime
+  test), themes, the second search box, taking permissions back, and setting
+  the launcher. Replay it any time from Settings.
