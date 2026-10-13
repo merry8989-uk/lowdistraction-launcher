@@ -26,17 +26,20 @@ updates:
       - dependency-name: "org.jdom:jdom2"
       - dependency-name: "xerces:xercesImpl"
       - dependency-name: "org.jetbrains.kotlin:kotlin-gradle-plugin"
-      # Major bumps that need compileSdk 35 and a newer Gradle than this project
-      # builds with yet. Worth revisiting when the toolchain moves.
+      # AndroidX ships newer releases built against SDK 35+, and this project
+      # compiles against 34, so AGP refuses to build them. Patch releases still
+      # come through. Revisit when compileSdk moves up.
+      - dependency-name: "androidx.core:core-ktx"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      - dependency-name: "androidx.recyclerview:recyclerview"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      # Toolchain majors that need a newer compileSdk and Gradle than this project
+      # builds with yet.
       - dependency-name: "com.android.application"
         update-types: ["version-update:semver-major"]
       - dependency-name: "org.jetbrains.kotlin.android"
         update-types: ["version-update:semver-major"]
       - dependency-name: "gradle-wrapper"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "androidx.core:core-ktx"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "androidx.recyclerview:recyclerview"
         update-types: ["version-update:semver-major"]
 
   # Keep the GitHub Actions themselves current (supply-chain hygiene).
