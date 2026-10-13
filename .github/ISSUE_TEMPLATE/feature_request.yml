@@ -1,0 +1,31 @@
+name: Feature request
+description: Suggest something for Low Distraction
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Low Distraction is deliberately small. Ideas that keep it quiet, offline
+        and out of the way fit best.
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like?
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why would it help?
+    validations:
+      required: true
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Please confirm
+      options:
+        - label: This does not need the app to access the internet
+          required: true
+        - label: This does not need trackers or analytics
+          required: true

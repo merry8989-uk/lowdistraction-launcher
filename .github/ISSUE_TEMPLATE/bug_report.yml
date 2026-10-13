@@ -1,0 +1,49 @@
+name: Bug report
+description: Something in Low Distraction does not work as it should
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. Please fill this in as fully as you can.
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: Settings shows it under "Check for updates".
+      placeholder: "1.26"
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device and Android version
+      placeholder: "Samsung Galaxy S23, Android 15"
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Long-press the home screen
+        2. Open ...
+        3. Tap ...
+    validations:
+      required: false
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before posting
+      options:
+        - label: I am on the latest release from the Releases page
+        - label: I have searched the existing issues
+          required: true
