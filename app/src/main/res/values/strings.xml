@@ -195,10 +195,14 @@
 
     <!-- Pause before opening -->
     <string name="settings_row_pause">Pause before opening apps</string>
-    <string name="settings_pause_desc">A 7-second breather first — tap anywhere to cancel</string>
+    <string name="settings_pause_desc">A short breather first — tap anywhere to cancel</string>
     <string name="pause_question">Do you really need this right now?</string>
     <string name="pause_sub">Or are you just here to burn some time?</string>
-    <string name="pause_cancel_hint">Tap anywhere to cancel · 7 seconds</string>
+    <string name="pause_cancel_hint">%1$d seconds · tap anywhere to cancel</string>
+    <string name="settings_row_pause_tick">Tick sound</string>
+    <string name="settings_pause_tick_desc">A soft tick each second while the timer runs</string>
+    <string name="settings_row_pause_seconds">Timer length</string>
+    <string name="pause_seconds_value">%1$d seconds</string>
     <string name="pause_cancelled">%1$s not opened</string>
     <string name="lock_needs_accessibility">Turn on the accessibility service to lock the screen</string>
 

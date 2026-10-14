@@ -340,6 +340,11 @@ class MainActivity : Activity() {
         stopBackgroundDrift()
     }
 
+    override fun onDestroy() {
+        TimerTick.release()
+        super.onDestroy()
+    }
+
     // ------------------------------------------------ slow background drift
     private fun startBackgroundDrift() {
         if (bgDrawable == null) {
@@ -470,8 +475,9 @@ class MainActivity : Activity() {
         val density = resources.displayMetrics.density
         fun px(value: Int) = (value * density).toInt()
 
+        val seconds = ShortcutPrefs.pauseSeconds(this)
         val counter = TextView(this).apply {
-            text = PAUSE_SECONDS.toString()
+            text = seconds.toString()
             setTextColor(theme.textPrimary)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 52f)
             typeface = Typeface.MONOSPACE
@@ -517,7 +523,7 @@ class MainActivity : Activity() {
         box.addView(counter)
         box.addView(
             TextView(this).apply {
-                text = getString(R.string.pause_cancel_hint)
+                text = getString(R.string.pause_cancel_hint, seconds)
                 setTextColor(theme.textSecondary)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
                 typeface = Typeface.MONOSPACE
@@ -541,7 +547,7 @@ class MainActivity : Activity() {
         dialog.setCancelable(false)
         gateDialog = dialog
 
-        var remaining = PAUSE_SECONDS
+        var remaining = seconds
         val tick = object : Runnable {
             override fun run() {
                 if (gateFinished) return
@@ -553,6 +559,7 @@ class MainActivity : Activity() {
                     return
                 }
                 counter.text = remaining.toString()
+                playTick(remaining)
                 gateHandler.postDelayed(this, 1000L)
             }
         }
@@ -583,7 +590,14 @@ class MainActivity : Activity() {
             ViewGroup.LayoutParams.MATCH_PARENT
         )
         dialog.window?.setBackgroundDrawable(ColorDrawable(theme.bg))
+        playTick(remaining)
         gateHandler.postDelayed(tick, 1000L)
+    }
+
+    /** A soft tick each second; the last few are a little brighter. */
+    private fun playTick(remaining: Int) {
+        if (!ShortcutPrefs.isTickSoundEnabled(this)) return
+        TimerTick.play(this, urgent = remaining <= 3)
     }
 
     private fun announceCancel(app: AppInfo) {
@@ -1065,8 +1079,6 @@ class MainActivity : Activity() {
         private const val INDEX_MAX_AGE_MS = 7L * 24 * 60 * 60 * 1000
         /** Pinned rows are drawn half again as large as the rest. */
         private const val PINNED_SCALE = 1.5f
-        /** The breather before an app opens. */
-        private const val PAUSE_SECONDS = 7
         private const val LOCK_DEBOUNCE_MS = 600L
         /** Degrees per second for the background — a full cycle takes ~5 minutes. */
         private const val BG_HUE_SPEED = 1.6f

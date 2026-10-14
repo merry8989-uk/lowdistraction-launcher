@@ -1,0 +1,9 @@
+The pause before opening: a tick, and your own timer length
+
+- A soft tick now sounds once a second while the timer runs. The last three
+  ticks are a little brighter, so you can hear it running out.
+- Settings gains a Tick sound switch, so the ticking can be turned off on its
+  own, without turning the timer off.
+- Settings gains Timer length. Set the breather anywhere from 1 second to 2
+  minutes — however long you want it. It was fixed at 7 seconds before.
+- The pause itself can still be switched off entirely, as before.

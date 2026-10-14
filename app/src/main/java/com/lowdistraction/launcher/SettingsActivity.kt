@@ -66,6 +66,8 @@ class SettingsActivity : Activity() {
 
         findViewById<View>(R.id.row_wheel_sound).setOnClickListener { showWheelSoundDialog() }
 
+        findViewById<View>(R.id.row_pause_seconds).setOnClickListener { showPauseSecondsDialog() }
+
         findViewById<View>(R.id.row_guide).setOnClickListener {
             startActivity(Intent(this, GuideActivity::class.java))
         }
@@ -137,6 +139,17 @@ class SettingsActivity : Activity() {
         pause.setOnCheckedChangeListener { _, isChecked ->
             ShortcutPrefs.setLaunchPauseEnabled(this, isChecked)
         }
+
+        val pauseTick = findViewById<Switch>(R.id.pause_tick_switch)
+        pauseTick.setOnCheckedChangeListener(null)
+        pauseTick.isChecked = ShortcutPrefs.isTickSoundEnabled(this)
+        pauseTick.setOnCheckedChangeListener { _, isChecked ->
+            ShortcutPrefs.setTickSoundEnabled(this, isChecked)
+            // Let the switch be heard, so it is obvious what it controls.
+            if (isChecked) TimerTick.play(this, urgent = false)
+        }
+
+        updatePauseSecondsRow()
 
         findViewById<TextView>(R.id.wheelSoundDesc).text = WheelSound.selected(this).name
     }
@@ -371,6 +384,58 @@ class SettingsActivity : Activity() {
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+
+    /** How long the breather lasts, anywhere from one second to two minutes. */
+    private fun showPauseSecondsDialog() {
+        val theme = Look.theme(this)
+        val summary = TextView(this).apply {
+            setText(
+                getString(
+                    R.string.pause_seconds_value,
+                    ShortcutPrefs.pauseSeconds(this@SettingsActivity)
+                )
+            )
+            setTextColor(theme.accent)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+            typeface = Typeface.MONOSPACE
+        }
+        val bar = SeekBar(this).apply {
+            max = ShortcutPrefs.MAX_PAUSE_SECONDS - 1
+            progress = ShortcutPrefs.pauseSeconds(this@SettingsActivity) - 1
+        }
+        bar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
+                summary.setText(getString(R.string.pause_seconds_value, p + 1))
+            }
+
+            override fun onStartTrackingTouch(sb: SeekBar?) {}
+
+            override fun onStopTrackingTouch(sb: SeekBar?) {}
+        })
+
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(24), dp(12), dp(24), 0)
+        }
+        box.addView(summary)
+        box.addView(bar)
+
+        AlertDialog.Builder(this)
+            .setTitle(R.string.settings_row_pause_seconds)
+            .setView(box)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                ShortcutPrefs.setPauseSeconds(this, bar.progress + 1)
+                updatePauseSecondsRow()
+                Toast.makeText(this, R.string.saved, Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun updatePauseSecondsRow() {
+        findViewById<TextView>(R.id.pauseSecondsValue).text =
+            getString(R.string.pause_seconds_value, ShortcutPrefs.pauseSeconds(this))
+    }
 
     // ------------------------------------------------- payment & government apps
     private fun showSensitiveDialog() {
