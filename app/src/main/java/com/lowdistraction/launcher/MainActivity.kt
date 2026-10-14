@@ -3,6 +3,7 @@ package com.lowdistraction.launcher
 import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
+import android.app.Dialog
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -77,7 +78,7 @@ class MainActivity : Activity() {
 
     // The seven-second breather shown before an app opens
     private val gateHandler = Handler(Looper.getMainLooper())
-    private var gateDialog: AlertDialog? = null
+    private var gateDialog: Dialog? = null
     private var gateRunnable: Runnable? = null
     private var gateApp: AppInfo? = null
     private var gateFinished = false
@@ -525,10 +526,19 @@ class MainActivity : Activity() {
             }
         )
 
-        val dialog = AlertDialog.Builder(this)
-            .setView(box)
-            .setCancelable(false)
-            .create()
+        // A plain full-screen dialog rather than an AlertDialog. An AlertDialog's
+        // content view is only as tall as its own text, so taps above and below
+        // that strip never reached the cancel listener. This one fills the screen,
+        // so a tap truly anywhere cancels.
+        val dialog = Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        dialog.setContentView(
+            box,
+            ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        )
+        dialog.setCancelable(false)
         gateDialog = dialog
 
         var remaining = PAUSE_SECONDS

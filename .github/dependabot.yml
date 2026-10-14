@@ -11,36 +11,6 @@ updates:
     labels:
       - "dependencies"
       - "security"
-    ignore:
-      # Build-tooling libraries that ship inside Gradle and the Android Gradle
-      # Plugin. They never reach the APK, and Dependabot cannot resolve them from
-      # the dependency snapshot, which made the update job fail on every run
-      # with "dependency_not_found".
-      - dependency-name: "io.netty:*"
-      - dependency-name: "com.google.guava:*"
-      - dependency-name: "com.google.protobuf:*"
-      - dependency-name: "org.bouncycastle:*"
-      - dependency-name: "org.bitbucket.b_c:jose4j"
-      - dependency-name: "org.apache.commons:commons-compress"
-      - dependency-name: "commons-io:commons-io"
-      - dependency-name: "org.jdom:jdom2"
-      - dependency-name: "xerces:xercesImpl"
-      - dependency-name: "org.jetbrains.kotlin:kotlin-gradle-plugin"
-      # AndroidX ships newer releases built against SDK 35+, and this project
-      # compiles against 34, so AGP refuses to build them. Patch releases still
-      # come through. Revisit when compileSdk moves up.
-      - dependency-name: "androidx.core:core-ktx"
-        update-types: ["version-update:semver-minor", "version-update:semver-major"]
-      - dependency-name: "androidx.recyclerview:recyclerview"
-        update-types: ["version-update:semver-minor", "version-update:semver-major"]
-      # Toolchain majors that need a newer compileSdk and Gradle than this project
-      # builds with yet.
-      - dependency-name: "com.android.application"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "org.jetbrains.kotlin.android"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "gradle-wrapper"
-        update-types: ["version-update:semver-major"]
 
   # Keep the GitHub Actions themselves current (supply-chain hygiene).
   - package-ecosystem: "github-actions"

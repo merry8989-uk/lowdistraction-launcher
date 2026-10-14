@@ -1,0 +1,7 @@
+The pause before opening: tap anywhere really does cancel
+
+- The seven-second breather now covers the whole screen, so a tap anywhere on
+  it cancels the launch. Before, only taps in the middle worked, because the
+  dialog was only as tall as its own text and the rest of the screen was not
+  part of it.
+- Back still cancels too, and letting the count run out still opens the app.
