@@ -1,96 +1,215 @@
-# Low Distraction Launcher
+# Low Distraction
 
-A minimal, text-only Android home screen written in Kotlin. No icons, no
-widgets, no folders — just the clock, a search box and an alphabetical list
-of app names. Inspired by launchers like Olauncher.
+A minimal, **text-only** Android launcher. Your home screen becomes a plain
+list of app names — no icons, no wallpaper, no widgets, no folders, no dock, no
+feed — plus a short **pause** before any app opens, and an assistive-touch
+bubble when you want one.
+
+It is also **unable to reach the internet**: the app ships with no internet
+permission at all, and a build-time check fails the build if that ever changes.
+
+Current version: **1.28** (`versionCode` 29) · Licence: **AGPL-3.0**
+
+---
+
+## The idea
+
+Most launchers are designed to be looked at. This one is designed to be left.
+
+A launcher is the first thing you see when you unlock a phone, dozens of times
+a day, and every modern home screen is an invitation: a wallpaper to admire,
+icons to arrange, widgets to check, a search bar that answers anything, a feed
+that never ends. Low Distraction takes all of that away. What is left is a text
+list, a search box you have to actually type into, and one deliberate moment of
+friction before an app opens.
+
+It is a small, unglamorous tool with a single opinion: **the phone should be
+boring on purpose.**
+
+## How it works
+
+1. **Set it as your Home app.** Install, then *Settings → Set as default
+   launcher*, which opens Android's own Home-app picker. Pick Low Distraction,
+   press Home, and the text list is your home screen.
+2. **You see names, not icons.** Apps appear as plain text in a single column,
+   in the theme's typeface.
+3. **You tap an app and hit a pause.** The screen asks *“Do you really need
+   this right now?”* with a countdown. **Tap anywhere to cancel** — the whole
+   screen is the cancel button. Let it run out and the app opens.
+4. **Or you reach for the bubble.** A small assistive-touch circle floats over
+   everything; long-press it for a radial wheel of your pinned apps.
+
+There is no third screen, no drawer, and no hidden gesture to learn. A
+nine-step first-run guide walks through all of it once, and can be replayed any
+time from *Settings → How to use*.
+
+---
 
 ## Features
 
-- Text-only alphabetical list of installed launchable apps (RecyclerView).
-- Live search / filter as you type.
-- Auto-open on unique match: when a query narrows the list to exactly one
-  app, it launches by itself after a short pause (keep typing to cancel).
-  Pressing Enter / Search on the keyboard opens the top match.
-- Clock + date header (auto-updating `TextClock` widgets).
-- Long-press an app for a small menu: **App info**, **Uninstall**, **Hide app**.
-- Hidden apps are filtered out of the list; long-press the **clock** →
-  *Hidden apps* to see and unhide them.
-- **Assistive bubble:** a draggable floating button. Single/double tap opens a
-  radial menu — up to 8 pinned apps around three nested circles
-  (inner = Back, middle = Home, outer = Lock). Long-press the bubble for a
-  device-shortcuts panel: Torch, Sound, Brightness, Focus mode, DND,
-  Bedtime mode, and Tea mode (a 5-minute break screen).
-- Gestures: swipe **right** in the list opens the dialer, swipe **left**
-  opens the camera.
-- **Settings:** long-press anywhere on the home screen (empty space, clock or
-  background) to open Settings — the assistive-bubble on/off switch, ring apps,
-  hidden apps, and a contact link all live there.
-- **Two search bars.** The left one filters apps (with auto-open on a unique
-  match). The right one is a system search: it looks through device-settings
-  shortcuts, contacts and calendar events, and falls back to the device's own
-  search. (Contacts/calendar need the runtime permissions, asked the first time
-  you tap into that field.)
-- **Slowly drifting background.** The home screen's colour shifts through soft
-  dark tints so gradually you barely notice it changing.
-- **Dev.Check (optional, off by default).** Turn it on in Settings and a small
-  **Dev.Check** badge appears above the right search bar — tap it to open the
-  **Dev.Check window**: a full-screen, tabbed read-out of the device
-  (Dashboard, Hardware, System, Battery, Network, Apps, Camera, Sensors). While
-  it is on, the right search also surfaces the same shortcuts, opening the
-  matching tab (or the matching system screen for Hardware / Battery / Network /
-  Display / Storage / Apps). Long-press the badge for Settings.
-- **Check for updates** lives in Settings. Because the app has no INTERNET
-  permission it cannot check by itself, so the row shows your current version
-  and opens the releases page in your browser (the browser has network access;
-  the app still does not).
-- Registers as a HOME app. On first launch it shows a **“Set as default
-  launcher”** prompt (Android's own role dialog on Android 10+, Home settings
-  on older versions); you can also trigger it any time from Settings →
-  *Set as default launcher*.
-- Dark, monospace, distraction-free styling.
+### The home screen
 
-## Project layout
+- **Text-only list** of installed launchable apps.
+- **Clock + date header** (auto-updating `TextClock`).
+- **Three display modes:** name only (the default), icon only, or icon + name.
+- **Pinned grid** at the top for the apps you reach for constantly. You choose
+  its shape — **1 to 10 rows by 1 to 4 columns**, three by two by default.
+  Nothing is ever pinned for you.
+- **17 sort orders:** alphabetical either way, newest/oldest installed,
+  recently updated, most/least opened, most/least time spent, largest/smallest,
+  shortest/longest name, and more. Each order can be switched off individually.
+  The four that need usage access fall back to name order, with a note, if you
+  decline.
+- **Hidden apps:** take an app off the list without uninstalling it. It stays
+  openable from *Settings → Hidden apps* and comes straight back when unhidden.
 
-```
-lowdistraction-launcher/
-├── settings.gradle.kts
-├── build.gradle.kts
-├── gradle.properties
-├── gradlew / gradlew.bat / gradle/wrapper/…
-├── .github/workflows/{build.yml,release.yml}
-└── app/
-    ├── build.gradle.kts
-    └── src/main/
-        ├── AndroidManifest.xml
-        ├── java/com/lowdistraction/launcher/
-        │   ├── AppInfo.kt          # data class for one app
-        │   ├── AppRepository.kt    # loads + sorts launchable apps
-        │   ├── AppListAdapter.kt   # text-only RecyclerView adapter
-        │   ├── HiddenApps.kt       # SharedPreferences-backed hide list
-        │   └── MainActivity.kt     # home screen logic + gestures
-        └── res/
-            ├── layout/activity_main.xml
-            ├── layout/item_app.xml
-            ├── values/{strings,colors,themes}.xml
-            ├── drawable/{search_bg,ic_launcher_foreground}.xml
-            └── mipmap-anydpi-v26/ic_launcher.xml
-```
+### Opening an app
+
+- **The pause.** A full-screen question with a countdown you set — **anywhere
+  from 1 second to 2 minutes**. Tap anywhere to cancel.
+- **Tick sound.** A soft tick each second, with the last three a little
+  brighter so you can hear it running out. The tick has its **own** switch, so
+  the timer can run silently. The pause itself can be switched off too.
+- **Auto-open on a unique match.** When a search narrows the list to exactly
+  one app it launches by itself after a short pause — keep typing to cancel.
+  Enter/Search opens the top match.
+- **Double-tap** the header or an empty part of the list to **lock the screen**.
+
+### Search
+
+- The **left search box** filters your apps as you type.
+- A **second, opt-in search box** appears once you switch on any source in
+  *Settings → Search sources*. Sources: **settings shortcuts, contacts,
+  calendar, files, and Dev.Check**. Every source is **off by default** and asks
+  for its own permission when you turn it on.
+- **Every source shows whether it holds its permission**, with a *Remove
+  permission…* button beside it that opens this app's page in system settings.
+- **Search inside files:** switch on *All files access* to search the whole of
+  storage by name — documents, media, sub-folders — with no folder picking. If
+  you would rather not grant that, add individual folders instead. Either way,
+  nothing is uploaded and nothing is indexed anywhere but on the phone.
+
+### The assistive bubble and the wheel
+
+A draggable floating bubble, like AssistiveTouch.
+
+- **1 tap** → Back · **2 taps** → Home · **3 taps** → Lock/sleep
+- **Long-press** → the **spin wheel**: up to **8 pinned apps** around a ring,
+  with a **+** slot while there is room. Drag to spin it — it keeps spinning
+  with momentum and plays a soft chime as slots pass by. Tap a slot to open
+  that app; **long-press a slot to remove it**.
+- The **bottom row** of the wheel holds four quick actions: **Torch, Volume,
+  Do Not Disturb and Break** (a five-minute break screen).
+- **16 selectable wheel sounds**, all synthesised inside the app.
+- **It gets out of the way of money.** The bubble hides itself over **96
+  built-in payment, banking, brokerage, insurance and government packages**,
+  and over any app whose name looks financial. Add your own, or exempt one that
+  was caught by mistake. There is also an *Also pause accessibility* switch.
+
+### Appearance
+
+- **62 built-in themes** — 31 dark, 30 light, plus Graphite — all generated
+  from a hue and a strength so they feel like one family.
+- **Build your own theme** from four colours with an HSV picker.
+- **Icon controls:** size (24–96), shape and outline.
+- **Text controls:** size, weight (bold), letter-spacing.
+- **Drifting glow:** the soft background glow can be turned off.
+
+### Dev.Check
+
+An optional, built-in device dashboard — off by default. Switch it on and a
+small **Dev.Check** badge appears above the second search box; tap it for a
+tabbed read-out of the device: **Hardware, System, Battery, Network, Apps,
+Camera and Sensors** (the sensor tab shows live values that update as you hold
+the phone). The same shortcuts also appear in the second search box while it is
+on. No ads, no upsell, no Pro version.
+
+### Gestures
+
+| Gesture | Action |
+| --- | --- |
+| Long-press anywhere on the home screen | Open Settings |
+| Swipe right in the list | Open the dialer |
+| Swipe left in the list | Open the camera |
+| Double-tap the header / empty list | Lock the screen |
+
+---
+
+## Privacy
+
+**There are no trackers, no analytics, no crash reporting, no ads, no accounts
+and no Pro features.** There is nowhere for data to go, so nothing is collected
+in the first place.
+
+The app **cannot reach the network**. The source manifest declares
+`android.permission.INTERNET` with `tools:node="remove"`, which strips it out
+of the merged manifest no matter what a dependency tries to add, and a
+`checkNoInternet` guard in the Gradle build **fails the build** if that
+declaration is ever removed. The released APK contains no internet permission
+at all — you can verify that on the file.
+
+### What it asks for, and when
+
+Permissions that are off by default are never requested until you switch on the
+feature that needs them.
+
+| Permission | What it is for | Needed when |
+| --- | --- | --- |
+| `INTERNET` | Nothing — removed from the app by the build itself | never |
+| `SYSTEM_ALERT_WINDOW` | Drawing the floating bubble over other apps | only if the bubble is on |
+| `FOREGROUND_SERVICE`, `…_SPECIAL_USE`, `POST_NOTIFICATIONS` | Keeping the bubble alive with a dismissible notification | only if the bubble is on |
+| `ACCESS_NETWORK_STATE`, `ACCESS_WIFI_STATE` | Reading your connection state so Dev.Check can display it (neither can open a connection) | only when you open Dev.Check |
+| `READ_CONTACTS` | Searching contacts from the second search box | off by default |
+| `READ_CALENDAR` | Searching the calendar from the second search box | off by default |
+| `MANAGE_EXTERNAL_STORAGE`, `READ_EXTERNAL_STORAGE` | Finding a file by name across storage | off by default |
+| `PACKAGE_USAGE_STATS` | The four sort orders based on app usage | only if you pick one of them |
+| `ACCESS_NOTIFICATION_POLICY` | The wheel's Do Not Disturb quick action | optional |
+| `WRITE_SETTINGS` | Screen brightness from the bubble's quick settings | optional |
+| `VIBRATE` | Haptic feedback on the wheel | optional |
+| `REQUEST_DELETE_PACKAGES` | The uninstall option in an app's long-press menu | optional |
+
+---
+
+## Install
+
+Low Distraction is **not on Google Play**, and has no interest in being. It is
+built and released from source, and signed with the same key every time.
+
+- **GitHub Releases** — the signed APK, built by CI from the tagged commit:
+  <https://github.com/merry8989-uk/lowdistraction-launcher/releases/latest>
+- **Free-software repositories** — inclusion requests are open for **F-Droid**
+  and **IzzyOnDroid**; until they are accepted, use the releases page.
+
+Once installed, open **Settings → Apps → Default apps → Home app** and pick
+**Low Distraction** (or use *Settings → Set as default launcher* inside the
+app, which opens that same system screen).
+
+---
 
 ## Requirements
 
 - Android SDK Platform **34** and Build-Tools **34.0.0**
 - JDK 17
-- Gradle 8.x (the wrapper pins 8.2)
-- Android Gradle Plugin 8.1.4, Kotlin 1.9.22
+- Gradle 8.x (the wrapper pins **8.2**)
+- Android Gradle Plugin **8.1.4**, Kotlin **1.9.22**
 - `minSdk 26` (Android 8.0), `targetSdk 34`
 
-> Why 34 and not 35? Termux's arm64 `aapt2` currently tops out at compileSdk 34.
-> If you build on a PC you can bump to 35 safely.
+> **Why 34 and not 35?** Termux's arm64 `aapt2` currently tops out at
+> compileSdk 34. On a PC you can bump to 35 safely.
+>
+> **Why not Gradle 9 / AGP 8.13 / Kotlin 2.x?** Gradle 9 removed
+> `DependencyHandler.module(Object)`, which AGP 8.1.x still calls, so the build
+> fails outright. Adopting any of those means moving to AGP 8.13 +
+> compileSdk 35 + Kotlin 2.x together — a deliberate migration, not a version
+> bump. `.github/dependabot.yml` ignores those majors so they are not proposed
+> as routine updates.
+
+---
 
 ## Building in Termux (aarch64, no root, no PC)
 
 The one real obstacle on aarch64 Termux is `aapt2`: Google only ships an
-x86_64 binary, so Gradle's bundled copy can't run. The fix is to install
+x86_64 binary, so Gradle's bundled copy cannot run. The fix is to install
 Termux's own arm64 `aapt2` and point Gradle at it.
 
 ```bash
@@ -124,42 +243,33 @@ echo "sdk.dir=$ANDROID_HOME" > local.properties
 ./gradlew assembleDebug
 ```
 
-The APK lands at:
-
-```
-app/build/outputs/apk/debug/app-debug.apk
-```
-
-If `./gradlew` gives you trouble, skip the wrapper and use system Gradle:
+The APK lands at `app/build/outputs/apk/debug/app-debug.apk`. If `./gradlew`
+gives you trouble, skip the wrapper and use system Gradle:
 `gradle assembleDebug`.
 
-## Installing it on the phone
-
-```bash
-cp app/build/outputs/apk/debug/app-debug.apk /sdcard/Download/
-```
-
-Then open the file with a file manager and install it (allow "install
-unknown apps" for that file manager). Finally go to
-**Settings → Apps → Default apps → Home app** and pick **Low Distraction**.
+To install it, copy the APK to `/sdcard/Download/`, open it with a file manager
+and allow "install unknown apps" for that manager.
 
 ## Building in the cloud (recommended)
 
-Push the repo to GitHub and you get two workflows for free:
+Push the repo to GitHub and the workflows do it for you:
 
 - **`.github/workflows/build.yml`** — builds a debug APK on every push and
-  uploads it as a downloadable artifact (Actions tab → run → Artifacts).
-- **`.github/workflows/release.yml`** — builds the APK and attaches it to a
-  GitHub **Release**. Trigger it by pushing a tag:
+  uploads it as an artifact (Actions tab → run → Artifacts).
+- **`.github/workflows/release.yml`** — builds the **signed** APK and attaches
+  it to a GitHub **Release**. Trigger it by pushing a tag:
 
   ```bash
-  git tag v1.1 && git push origin v1.1
+  git tag v1.28 && git push origin v1.28
   ```
 
-  or run it manually from the Actions tab and type a tag name. The APK shows
-  up on the repo's Releases page, ready to download and install.
+  or run it manually from the Actions tab and type a tag name.
+- **`.github/workflows/codeql.yml`** — CodeQL analysis.
+- GitHub's **Automatic Dependency Submission** and **Dependabot** keep the
+  dependency graph and updates current.
 
-No local toolchain needed for either.
+Release notes come from
+`fastlane/metadata/android/en-US/changelogs/<versionCode>.txt`.
 
 ## Troubleshooting (Termux)
 
@@ -167,7 +277,7 @@ No local toolchain needed for either.
   aapt2. Make sure `~/.gradle/gradle.properties` contains the
   `android.aapt2FromMavenOverride` line pointing at `$PREFIX/bin/aapt2`.
 - **`Failed to install build-tools`** — run `sdkmanager "build-tools;34.0.0"`
-  again and accept licenses with `yes | sdkmanager --licenses`.
+  again and accept licences with `yes | sdkmanager --licenses`.
 - **`SDK location not found`** — you are missing `local.properties`
   (`sdk.dir=…`) or the `ANDROID_HOME` env var.
 - **Out of memory during the build** — lower `org.gradle.jvmargs` in
@@ -175,60 +285,94 @@ No local toolchain needed for either.
 - **`syntax error: unexpected ')'` from aapt2** — you are mixing an x86_64
   aapt2 with an arm64 one; remove any stale copies and rebuild.
 
-## Assistive bubble
+---
 
-A floating, draggable bubble (like iOS AssistiveTouch) with three overlays:
+## The assistive bubble, in detail
+
+A floating, draggable bubble (like iOS AssistiveTouch).
 
 - **Bubble taps:** 1 tap = Back, 2 taps = Home, 3 taps = Lock/sleep.
-- **Long press** the bubble → the menu: a **spin wheel** of up to 8 pinned apps
-  (drag to rotate, it keeps spinning with momentum and plays a soft chime as it
-  turns; tap a slot to launch, long-press a slot to remove) plus a **+** slot to
-  add more. Along the bottom sit four quick actions: **Torch, Volume, DND,
-  Break** (a 5-minute break screen).
+- **Drag** the bubble to move it anywhere.
+- **Long-press** the bubble → the spin wheel: up to 8 pinned apps, a **+** slot
+  to add more, and the bottom row of **Torch, Volume, DND, Break**.
 
-Turn it on from **Settings** (long-press anywhere on the home screen): there is
-a single switch to enable or disable the bubble.
+Turn it on from Settings (long-press anywhere on the home screen) — a single
+switch enables or disables it.
 
-Permissions it needs (grant them once):
-
-| Feature | What you must grant |
-| --- | --- |
-| Floating bubble | *Display over other apps* (Settings → Apps → Special access) |
-| Back / Home / Lock | enable the **Assistive bubble** accessibility service |
-| Brightness | *Modify system settings* |
-| Do Not Disturb | *Do Not Disturb access* |
-
-Honest limits: Android exposes **no public API** for Digital Wellbeing's
-*Focus mode* or *Bedtime mode*, so those buttons open the Digital Wellbeing
-settings screen rather than toggling silently. And a normal app cannot block
-the Home button, so **Tea mode** is a full-screen, Back-proof break screen —
-not an absolute lock (hold the hint 3 s to end it early).
+**Honest limits.** Android exposes **no public API** for Digital Wellbeing's
+Focus mode or Bedtime mode, so those buttons open the Digital Wellbeing
+settings screen rather than toggling silently. And a normal app cannot block the
+Home button, so **Break** is a full-screen, Back-proof break screen — not an
+absolute lock (hold the hint for 3 s to end it early).
 
 ## Contact
 
-The Settings screen has a plain **Ask for more features** link to
-`@osintgram_io` on Instagram. It is a normal web link — the app ships with no
-analytics, no crash reporting and no trackers of any kind.
+Settings has a plain **Ask for more features** link to `@osintgram_io` on
+Instagram. It is an ordinary web link — the app itself ships with no analytics,
+no crash reporting and no trackers of any kind.
 
 ## Signing
 
-The CI builds a **signed release APK** using a fixed keystore, so every build
-shares one signature and Android can update in place — no more "App not
-installed" when installing a newer build over an older one.
+CI builds a **signed release APK** using a fixed keystore, so every build shares
+one signature and Android can update in place — no more "App not installed" when
+installing a newer build over an older one.
 
 The keystore lives in four repository secrets (never in the repo):
 `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`. When the
-secrets are missing, the release build silently falls back to the debug key so
-a local `./gradlew assembleRelease` still works.
+secrets are missing, the release build falls back to the debug key so a local
+`./gradlew assembleRelease` still works.
 
-> Keep a backup of the keystore and its password. If they are lost you can
-> never publish an update with the same signature again — you would have to
-> uninstall and reinstall.
+> Keep a backup of the keystore and its password. If they are lost you can never
+> publish an update with the same signature again — you would have to uninstall
+> and reinstall.
 
-## Extending it
+## Project layout
 
-- **Double-tap to lock screen:** use `DevicePolicyManager` (needs the
-  device-admin permission).
-- **More gestures:** add cases to `onFling` in `MainActivity.setupGestures`
-  (e.g. swipe up = open search and focus it).
-- **Favourites row:** pin a few package names above the alphabetical list.
+```
+lowdistraction-launcher/
+├── settings.gradle.kts · build.gradle.kts · gradle.properties
+├── gradlew / gradlew.bat / gradle/wrapper/…
+├── docs/index.html                  # the prototype / showcase page (GitHub Pages)
+├── fastlane/metadata/android/en-US/ # store metadata + per-version changelogs
+├── .github/{workflows,dependabot.yml,ISSUE_TEMPLATE,pull_request_template.md}
+└── app/src/main/
+    ├── AndroidManifest.xml
+    ├── java/com/lowdistraction/launcher/
+    │   ├── MainActivity.kt          # home screen, gestures, the launch pause
+    │   ├── AppRepository.kt · AppInfo.kt · AppListAdapter.kt
+    │   ├── AppSort.kt · AppUsage.kt # 17 sort orders + the launcher's own tallies
+    │   ├── Look.kt                  # 62 themes, icons, text sizing
+    │   ├── ShapedIconDrawable.kt    # icon shapes / outlines
+    │   ├── AppearanceActivity.kt · SortSettingsActivity.kt · SettingsActivity.kt
+    │   ├── SearchSources.kt · SearchSourcesActivity.kt
+    │   ├── QuickFind.kt · QuickFindAdapter.kt   # the second, opt-in search box
+    │   ├── FileIndex.kt             # file search (all-files access or folders)
+    │   ├── HiddenApps.kt · PinnedApps.kt
+    │   ├── SensitiveApps.kt         # 96 payment/gov packages + name detection
+    │   ├── DevCheck*.kt · DeviceInfo.kt         # the Dev.Check dashboard
+    │   ├── WheelSound.kt · Chime.kt · TimerTick.kt
+    │   ├── GuideActivity.kt · HomeRole.kt · ShortcutPrefs.kt
+    │   └── bubble/
+    │       ├── FloatingBubbleService.kt · AssistiveTouchService.kt
+    │       ├── RadialMenuView.kt · QuickSettings.kt
+    │       ├── BubblePrefs.kt · TeaModeActivity.kt
+    └── res/
+        ├── layout/  raw/ (17 sounds)  drawable/  values/  xml/
+        └── mipmap-anydpi-v26/ic_launcher.xml
+```
+
+## Contributing
+
+Bug reports and pull requests are welcome — please use the issue templates in
+`.github/ISSUE_TEMPLATE/`. See `CONTRIBUTING.md`.
+
+Two house rules the project will not bend on:
+
+1. **No internet permission, ever.** The `checkNoInternet` build guard enforces
+   it.
+2. **No trackers, analytics, telemetry, ads or paid tiers.**
+
+## Licence
+
+**AGPL-3.0.** See `LICENSE`. You are free to build it yourself; CI publishes the
+exact APK for every tag.
