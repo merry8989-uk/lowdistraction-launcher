@@ -11,6 +11,42 @@ updates:
     labels:
       - "dependencies"
       - "security"
+    ignore:
+      # ---------------------------------------------------------------- toolchain
+      # This project builds with AGP 8.1.4 / Gradle 8.2 / compileSdk 34.
+      # Gradle 9 removed DependencyHandler.module(Object), which AGP 8.1.x still
+      # calls, so a wrapper major breaks the build outright. Kotlin 2.x needs a
+      # newer Gradle too, which lands in the same place. Adopting any of these is
+      # a deliberate migration (it means moving compileSdk), not a version bump.
+      - dependency-name: "gradle-wrapper"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "org.jetbrains.kotlin.android"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "com.android.application"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "org.jetbrains.kotlin:kotlin-gradle-plugin"
+
+      # ------------------------------------------------- never in the APK
+      # Build-tooling transitives. Dependabot cannot resolve them in our
+      # dependency graph at all, so both version and security update jobs fail
+      # with dependency_not_found. They never ship, so they are ignored by name
+      # (which, unlike update-types, also applies to security updates).
+      - dependency-name: "io.netty:*"
+      - dependency-name: "com.google.guava:*"
+      - dependency-name: "com.google.protobuf:*"
+      - dependency-name: "org.bouncycastle:*"
+      - dependency-name: "org.bitbucket.b_c:jose4j"
+      - dependency-name: "org.apache.commons:commons-compress"
+      - dependency-name: "commons-io:commons-io"
+      - dependency-name: "org.jdom:jdom2"
+      - dependency-name: "xerces:xercesImpl"
+
+      # ------------------------------------------------------- need compileSdk 35
+      # The 1.19 / 1.4 lines require compileSdk 35; we are on 34.
+      - dependency-name: "androidx.core:core-ktx"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      - dependency-name: "androidx.recyclerview:recyclerview"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
 
   # Keep the GitHub Actions themselves current (supply-chain hygiene).
   - package-ecosystem: "github-actions"
