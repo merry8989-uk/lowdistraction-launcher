@@ -1,0 +1,12 @@
+Email the report straight from Gmail, logs already attached
+
+- The Email button now opens Gmail directly, with no chooser in the way, and
+  everything already in place: the maintainer's address, a subject naming the
+  version, and the whole report in the message body.
+- The report is attached automatically, in two files at once — the readable
+  .txt and the structured .json — so nothing has to be attached by hand.
+- Nothing needs typing. Open it, read it if you like, and send.
+- No Gmail on the device? The same mail is offered to any other mail app, and if
+  none can take the attachment the address is shown so it can be copied.
+- Export and Share are unchanged: pick a format (.txt, .md, .json or .csv),
+  then save it to a file or hand it to any app.

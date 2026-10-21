@@ -330,8 +330,8 @@
     <string name="diag_clean_yes">Delete</string>
     <string name="diag_export">Export</string>
     <string name="diag_share">Share</string>
-    <string name="diag_email">Email the report</string>
-    <string name="diag_email_note">Opens your mail app with %1$s already filled in. The whole report goes into the message and is attached as a file, so there is nothing to type.</string>
+    <string name="diag_email">Email in Gmail</string>
+    <string name="diag_email_note">Opens Gmail with %1$s already filled in. The whole report goes into the message, and it is attached as both a .txt and a .json — nothing to type, nothing to attach. No Gmail? It offers any other mail app.</string>
     <string name="diag_preview">Preview — this is what gets exported:</string>
     <string name="diag_preview_cut">%1$d more characters in the exported file</string>
     <string name="diag_turn_off">Diagnostics are on — tap to turn them off</string>

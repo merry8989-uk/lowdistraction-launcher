@@ -364,65 +364,115 @@ class DiagnosticsActivity : Activity() {
             type = mime(ext)
             putExtra(Intent.EXTRA_STREAM, uri)
             putExtra(Intent.EXTRA_SUBJECT, mailSubject())
-            putExtra(Intent.EXTRA_TEXT, mailBody(text))
+            putExtra(Intent.EXTRA_TEXT, mailBody(text, listOf(file.name)))
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         startChooser(intent, R.string.diag_choose_share)
     }
 
     // ----------------------------------------------------------------- email
+    /**
+     * One tap and Gmail is open with everything already in place: the
+     * maintainer's address, a subject naming the version, the whole report in
+     * the message body, and the report attached as both a readable `.txt` and
+     * the structured `.json`. Nothing to type, nothing to attach by hand.
+     *
+     * Gmail is targeted directly so no chooser stands in the way. If it is not
+     * installed the same mail is offered to whatever else can take it, and if
+     * nothing can, the address is shown so it can be copied.
+     */
     private fun emailReport() {
         val current = report ?: return
         val text = DiagnosticsReport.renderText(current)
+        val json = DiagnosticsReport.renderJson(current)
         Events.diagnosticsAction(
             this, Events.DiagAction.EMAIL, Events.ExportFormat.TXT,
             Events.ExportChannel.EMAIL, text.length.toLong(), current.events.size
         )
-        val file = writeTemp(text, "txt")
-        val uri = file?.let {
-            runCatching { FileProvider.getUriForFile(this, packageName + ".files", it) }.getOrNull()
+
+        // Attach the readable report and the structured export together.
+        val files = ArrayList<File>()
+        writeTemp(text, "txt")?.let { files.add(it) }
+        writeTemp(json, "json")?.let { files.add(it) }
+        val uris = files.mapNotNull { file ->
+            runCatching {
+                FileProvider.getUriForFile(this, packageName + ".files", file)
+            }.getOrNull()
         }
 
-        // ACTION_SEND carries the attachment and pre-fills the recipient in
-        // Gmail and most other mail apps; the body holds the whole report so
-        // nothing has to be typed or attached by hand.
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_EMAIL, arrayOf(DiagnosticsReport.EMAIL))
-            putExtra(Intent.EXTRA_SUBJECT, mailSubject())
-            putExtra(Intent.EXTRA_TEXT, mailBody(text))
-            if (uri != null) {
-                putExtra(Intent.EXTRA_STREAM, uri)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
+        val subject = mailSubject()
+        val body = mailBody(text, files.map { it.name })
+
+        if (startMail(uris, subject, body, GMAIL)) return
+        if (startMail(uris, subject, body, null)) return
+
+        // No mail app would take the attachment — fall back to a plain mailto:
+        // link, and show the address so it can be copied by hand.
+        val mailto = Intent(
+            Intent.ACTION_SENDTO,
+            Uri.parse("mailto:" + DiagnosticsReport.EMAIL)
+        ).apply {
+            putExtra(Intent.EXTRA_SUBJECT, subject)
+            putExtra(Intent.EXTRA_TEXT, body)
         }
-        if (!startChooser(intent, R.string.diag_choose_mail)) {
-            // No mail app would take it — fall back to a plain mailto: link and
-            // show the address so it can be copied by hand.
-            val mailto = Intent(
-                Intent.ACTION_SENDTO,
-                Uri.parse("mailto:" + DiagnosticsReport.EMAIL)
-            ).apply {
-                putExtra(Intent.EXTRA_SUBJECT, mailSubject())
-                putExtra(Intent.EXTRA_TEXT, mailBody(text))
+        if (!startChooser(mailto, R.string.diag_choose_mail)) {
+            Toast.makeText(
+                this,
+                getString(R.string.diag_no_mail, DiagnosticsReport.EMAIL),
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    /**
+     * Hands the composed mail to one app, or to the chooser when [pkg] is null.
+     * Returns false when nothing on the device would take it.
+     */
+    private fun startMail(uris: List<Uri>, subject: String, body: String, pkg: String?): Boolean {
+        val multiple = uris.size > 1
+        val intent = Intent(
+            if (multiple) Intent.ACTION_SEND_MULTIPLE else Intent.ACTION_SEND
+        ).apply {
+            type = if (multiple) "*/*" else "text/plain"
+            putExtra(Intent.EXTRA_EMAIL, arrayOf(DiagnosticsReport.EMAIL))
+            putExtra(Intent.EXTRA_SUBJECT, subject)
+            putExtra(Intent.EXTRA_TEXT, body)
+            when {
+                uris.size == 1 -> putExtra(Intent.EXTRA_STREAM, uris[0])
+                uris.size > 1 ->
+                    putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
             }
-            if (!startChooser(mailto, R.string.diag_choose_mail)) {
-                Toast.makeText(
-                    this,
-                    getString(R.string.diag_no_mail, DiagnosticsReport.EMAIL),
-                    Toast.LENGTH_LONG
-                ).show()
-            }
+            if (uris.isNotEmpty()) addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            if (pkg != null) setPackage(pkg)
+        }
+        val send = if (pkg == null) {
+            Intent.createChooser(intent, getString(R.string.diag_choose_mail))
+        } else {
+            intent
+        }
+        return try {
+            startActivity(send)
+            true
+        } catch (_: ActivityNotFoundException) {
+            false
+        } catch (_: SecurityException) {
+            false
         }
     }
 
     private fun mailSubject(): String =
         "Low Distraction diagnostics — v" + Diag.versionName(this) + " (" + Diag.versionCode(this) + ")"
 
-    private fun mailBody(text: String): String =
-        "Nothing needs typing — just send this as it is.\n\n" +
-            "The report below is attached as a file as well.\n\n" +
-            "----------------------------------------\n\n" + text
+    private fun mailBody(text: String, attachments: List<String>): String = buildString {
+        append("Nothing needs typing — just send this as it is.\n\n")
+        if (attachments.isEmpty()) {
+            append("The report is below.\n\n")
+        } else {
+            append("Attached: ").append(attachments.joinToString(", ")).append("\n\n")
+        }
+        append("----------------------------------------\n\n")
+        append(text)
+    }
 
     private fun startChooser(intent: Intent, titleRes: Int): Boolean {
         val chooser = Intent.createChooser(intent, getString(titleRes))
@@ -456,5 +506,8 @@ class DiagnosticsActivity : Activity() {
         const val REQUEST_SAVE = 4401
         const val PREVIEW_LIMIT = 12000
         val FORMATS = arrayOf("txt", "md", "json", "csv")
+
+        /** Targeted so the mail opens straight in Gmail, with no chooser. */
+        const val GMAIL = "com.google.android.gm"
     }
 }
