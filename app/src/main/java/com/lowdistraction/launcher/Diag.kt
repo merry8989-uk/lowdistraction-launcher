@@ -286,7 +286,7 @@ object Diag {
     fun clear(c: Context) {
         val before = entries(c).size
         runCatching { file(c).writeText("") }
-        Events.diagnosticsAction(c, "clean", null, null, null, before)
+        Events.diagnosticsAction(c, Events.DiagAction.CLEAN, null, null, null, before)
     }
 
     private fun tail(c: Context): List<String> = runCatching {
