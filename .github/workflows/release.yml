@@ -71,7 +71,25 @@ jobs:
             echo 'body=' >> "$GITHUB_OUTPUT"
           fi
 
+      # A tag can trigger this workflow more than once, and this repository's
+      # releases are immutable — so a second run cannot replace the asset and
+      # would fail with "Cannot delete asset from an immutable release".
+      # If the release is already out, there is nothing to do: exit cleanly.
+      - name: Check whether this release already exists
+        id: exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Release $TAG already exists — nothing to publish."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish release
+        if: steps.exists.outputs.skip != 'true'
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
