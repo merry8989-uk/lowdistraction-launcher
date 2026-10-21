@@ -31,6 +31,11 @@ class AppearanceActivity : Activity() {
         buildUi()
     }
 
+    override fun onResume() {
+        super.onResume()
+        Events.screenView(this, "Appearance")
+    }
+
     // ------------------------------------------------------------- screen build
     private fun buildUi() {
         val theme = Look.theme(this)

@@ -40,8 +40,51 @@ class SearchSourcesActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        Events.screenView(this, "Search sources")
+        // Anything we sent the user away to fix now has an outcome to record.
+        resolvePendingFix()
+        Events.permissionStateResolved(this, "contacts", stateOf("contacts"), null)
+        Events.permissionStateResolved(this, "calendar", stateOf("calendar"), null)
+        Events.permissionStateResolved(this, "files", stateOf("files"), null)
         // Permission state may have changed while we were away.
         buildUi()
+    }
+
+    // ---------------------------------------------------- permission fixing
+    private var pendingFixAttempt: String? = null
+    private var pendingFixPermission: String? = null
+
+    private fun permState(ok: Boolean): Events.PermState =
+        if (ok) Events.PermState.GRANTED else Events.PermState.DENIED
+
+    private fun stateOf(key: String): Events.PermState = when (key) {
+        "contacts" -> permState(hasPermission(Manifest.permission.READ_CONTACTS))
+        "calendar" -> permState(hasPermission(Manifest.permission.READ_CALENDAR))
+        else -> permState(FileIndex.hasAllFilesAccess(this))
+    }
+
+    /** The intent half: the user has asked for a permission to be fixed. */
+    private fun requestFix(key: String) {
+        val attempt = Diag.newAttempt()
+        pendingFixAttempt = attempt
+        pendingFixPermission = key
+        Events.accessFixRequested(this, key, stateOf(key), attempt, "open_app_permission_screen")
+        openAppPermissionScreen()
+    }
+
+    /** The outcome half: what the permission actually looks like on return. */
+    private fun resolvePendingFix() {
+        val attempt = pendingFixAttempt ?: return
+        val key = pendingFixPermission ?: return
+        pendingFixAttempt = null
+        pendingFixPermission = null
+        val after = stateOf(key)
+        Events.accessFixResult(
+            this, attempt, "open_app_permission_screen", after,
+            if (after == Events.PermState.GRANTED) Events.Outcome.SUCCESS
+            else Events.Outcome.NO_OP,
+            null
+        )
     }
 
     // ------------------------------------------------------------- screen build
@@ -111,7 +154,8 @@ class SearchSourcesActivity : Activity() {
                 permissionRow(
                     getString(R.string.sources_permission_contacts),
                     hasPermission(Manifest.permission.READ_CONTACTS),
-                    theme
+                    theme,
+                    "contacts"
                 )
             )
         }
@@ -129,7 +173,8 @@ class SearchSourcesActivity : Activity() {
                 permissionRow(
                     getString(R.string.sources_permission_calendar),
                     hasPermission(Manifest.permission.READ_CALENDAR),
-                    theme
+                    theme,
+                    "calendar"
                 )
             )
         }
@@ -205,7 +250,7 @@ class SearchSourcesActivity : Activity() {
         )
 
         if (full) {
-            column.addView(permissionRow(getString(R.string.sources_all_files), true, theme))
+            column.addView(permissionRow(getString(R.string.sources_all_files), true, theme, "files"))
         } else {
             // Fallback: folders shared through the system picker.
             column.addView(
@@ -244,7 +289,7 @@ class SearchSourcesActivity : Activity() {
     }
 
     /** "Granted / Not granted" plus a button that opens the app's permission page. */
-    private fun permissionRow(title: String, granted: Boolean, theme: Theme): View {
+    private fun permissionRow(title: String, granted: Boolean, theme: Theme, key: String): View {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(2), 0, 0, dp(6))
@@ -272,7 +317,7 @@ class SearchSourcesActivity : Activity() {
                     typeface = Typeface.MONOSPACE
                     setPadding(0, dp(6), 0, 0)
                     isClickable = true
-                    setOnClickListener { openAppPermissionScreen() }
+                    setOnClickListener { requestFix(key) }
                 }
             )
         }
@@ -364,7 +409,14 @@ class SearchSourcesActivity : Activity() {
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQ_STORAGE) {
-            if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
+            val granted = grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED
+            Events.accessFixResult(
+                this, Diag.newAttempt(), "runtime_permission_prompt",
+                permState(granted),
+                if (granted) Events.Outcome.SUCCESS else Events.Outcome.FAILED,
+                null
+            )
+            if (granted) {
                 rebuildIndex()
             } else {
                 buildUi()

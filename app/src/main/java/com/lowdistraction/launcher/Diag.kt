@@ -1,49 +1,103 @@
 package com.lowdistraction.launcher
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import org.json.JSONObject
 import java.io.File
 import java.io.PrintWriter
 import java.io.RandomAccessFile
 import java.io.StringWriter
+import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
+import java.util.UUID
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * The in-app diagnostics log.
+ * The structured diagnostics log.
  *
- * Everything is appended to one plain-text file inside the app's own private
- * storage. Nothing is ever uploaded and the app has no internet permission, so
- * the log can only leave the phone when the user exports it themselves from
- * Settings → Diagnostics.
+ * One JSON object per line, in the app's own private storage. Every record
+ * carries the common event envelope (schema_version, timestamp, session_id,
+ * platform, app_version, os, device_model, network_type, screen_or_route,
+ * log_level, release_channel) plus that event's own properties — see
+ * `tools/logging_schema.json` for the schema and `docs/logging.md` for the
+ * reasoning.
  *
- * Diagnostics are **on by default** and can be switched off in Settings; when
- * they are off nothing at all is written.
- *
- * The file is one record per line, tab separated:
- *
- *     epochMillis \t LEVEL \t tag \t escaped-message
- *
- * Escaping keeps multi-line messages (a stack trace, say) on one line so the
- * file can be parsed back exactly for the CSV and JSON exports.
+ * House rules, all enforced or checked in CI:
+ *  - Every event is declared in [Events]; nothing else calls [event] directly,
+ *    and `tools/validate_logging.py` fails the build on an unknown event or
+ *    property.
+ *  - No PII. Values are redacted (email, long digit runs, filesystem paths) and
+ *    the user's own file names and raw search queries are never passed in.
+ *  - Diagnostics are ON by default and can be switched off in Settings; when off
+ *    nothing at all is written.
+ *  - Records older than [RETENTION_DAYS] are dropped on start, and the file is
+ *    rotated at [MAX_BYTES], so it can never grow without end.
+ *  - There is no transport. The app has no internet permission; a log leaves the
+ *    phone only when the user exports, shares or mails it.
  */
 object Diag {
+
+    const val SCHEMA_VERSION = "1.0.0"
+    const val PLATFORM = "android"
+    const val RELEASE_CHANNEL = "production"
 
     private const val PREFS = "diagnostics_prefs"
     private const val KEY_ENABLED = "enabled"
 
-    /** Rotate once the log passes this size, so it can never grow without end. */
-    private const val MAX_BYTES = 400L * 1024L
-
-    /** Most recent records kept when reading the log back for a report. */
-    const val MAX_READ = 4000
-
     const val FILE_NAME = "diagnostics.log"
 
-    data class Entry(val time: Long, val level: String, val tag: String, val message: String)
+    private const val MAX_BYTES = 512L * 1024L
+    private const val RETENTION_DAYS = 14L
+    private const val MAX_READ = 5000
+    private const val SAMPLE_1_IN = 5
+    private const val VALUE_CAP = 240
+    private const val TICK_MS = 1000L
+    private const val STALL_MS = 2000L
+
+    /** High-volume events only. Anything an error, or part of an intent→outcome
+     *  pair, is never sampled. */
+    private val SAMPLED = setOf("scroll_depth", "screen_view", "performance_marker")
+
+    /** Keys that belong to the envelope rather than to an individual event. */
+    val ENVELOPE = setOf(
+        "event_name", "schema_version", "timestamp", "session_id", "attempt_id",
+        "platform", "app_version", "os", "device_model", "network_type",
+        "screen_or_route", "log_level", "release_channel"
+    )
+
+    data class Event(
+        val name: String,
+        val time: Long,
+        val level: String,
+        val screen: String,
+        val session: String,
+        val props: Map<String, String>
+    )
 
     private val lock = Any()
+    private val sampleCounter = AtomicInteger(0)
+    private val fixAttempts = HashMap<String, Int>()
+
     private var appContext: Context? = null
+    private var sessionId: String? = null
+    private var sessionStartAt = 0L
+    private var processStartedAt = 0L
+    private var crashHooked = false
+
+    @Volatile private var currentScreen = "—"
+    @Volatile private var lastAction = "—"
+    @Volatile private var screenChangedAt = 0L
+
+    private val watchHandler = Handler(Looper.getMainLooper())
+    private var watchRunnable: Runnable? = null
+    private var lastTick = 0L
 
     // ------------------------------------------------------------- on / off
     private fun prefs(c: Context) = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -53,90 +107,252 @@ object Diag {
 
     fun setEnabled(c: Context, on: Boolean) {
         prefs(c).edit().putBoolean(KEY_ENABLED, on).apply()
-        if (on) info(c, "diagnostics", "Diagnostics switched on")
+        // Written after the flag, so switching it on records itself.
+        Events.diagnosticsToggled(c, on)
     }
 
     fun file(c: Context): File = File(c.filesDir, FILE_NAME)
 
+    // --------------------------------------------------------------- session
+    /** Called first thing from the Application, so a cold start can be timed. */
+    fun markProcessStart() {
+        processStartedAt = System.currentTimeMillis()
+    }
+
+    /** Milliseconds since the process was created, or 0 if it was not marked. */
+    fun coldStartMs(): Long =
+        if (processStartedAt == 0L) 0L else System.currentTimeMillis() - processStartedAt
+
+    /** Installs the crash handler early; safe to call repeatedly. */
+    fun installCrashHandler() {
+        val install = synchronized(lock) {
+            if (crashHooked) {
+                false
+            } else {
+                crashHooked = true
+                true
+            }
+        }
+        if (install) hookCrashes()
+    }
+
     /**
-     * Wires up the crash handler and notes the app version. Safe to call from
-     * every entry point — only the first call does any work.
+     * Begins or continues the session. The first call in a process is the cold
+     * start and creates the session id; a later call is a warm start and keeps
+     * it, so one launch is one session.
      */
-    fun install(c: Context) {
+    fun startSession(c: Context, coldMs: Long, warmMs: Long) {
         val ctx = c.applicationContext
         val first = synchronized(lock) {
-            if (appContext == null) {
+            if (sessionId == null) {
+                sessionId = "sess_" + shortId()
                 appContext = ctx
+                sessionStartAt = System.currentTimeMillis()
                 true
             } else {
                 false
             }
         }
+        if (first) prune(c)
         if (first) {
-            hookCrashes()
-            info(ctx, "diagnostics", "Diagnostics ready — v" + versionName(ctx))
+            Events.sessionStart(c, Events.StartType.COLD, coldMs, 0L)
+        } else {
+            Events.sessionStart(c, Events.StartType.WARM, 0L, warmMs)
         }
+        startWatch(c)
     }
 
-    // -------------------------------------------------------------- writing
-    fun info(c: Context, tag: String, message: String) = write(c, "INFO", tag, message)
+    /** The last event before the app leaves the foreground. */
+    fun endSession(c: Context) {
+        stopWatch()
+        Events.dropOff(c, currentScreen, lastAction, sessionDurationMs())
+    }
 
-    fun warn(c: Context, tag: String, message: String) = write(c, "WARN", tag, message)
+    fun sessionId(): String = sessionId ?: "sess_none"
 
-    fun error(c: Context, tag: String, message: String) = write(c, "ERROR", tag, message)
+    fun sessionDurationMs(): Long =
+        if (sessionStartAt == 0L) 0L else System.currentTimeMillis() - sessionStartAt
 
-    fun write(c: Context, level: String, tag: String, message: String) {
+    fun currentScreen(): String = currentScreen
+
+    fun setScreen(name: String) {
+        currentScreen = name
+        screenChangedAt = System.currentTimeMillis()
+    }
+
+    /** How long the current screen has been up, for `screen_view`. */
+    fun timeOnScreenMs(): Long =
+        if (screenChangedAt == 0L) 0L else System.currentTimeMillis() - screenChangedAt
+
+    fun setLastAction(action: String) {
+        lastAction = action
+    }
+
+    fun lastAction(): String = lastAction
+
+    /** A fresh correlation id for one user action and its outcome. */
+    fun newAttempt(): String = "att_" + shortId()
+
+    /** Counts fixes requested for one permission in this session. */
+    fun bumpFixAttempt(permission: String): Int = synchronized(lock) {
+        val n = (fixAttempts[permission] ?: 0) + 1
+        fixAttempts[permission] = n
+        n
+    }
+
+    // --------------------------------------------------------------- writing
+    /**
+     * The one low-level writer. **Only [Events] should call this** — the CI
+     * schema check relies on that.
+     */
+    fun event(c: Context, name: String, level: String, props: List<Pair<String, Any?>>) {
         if (!isEnabled(c)) return
+        if (name in SAMPLED && level == "info" && sampleCounter.incrementAndGet() % SAMPLE_1_IN != 0) {
+            return
+        }
         runCatching {
+            val now = System.currentTimeMillis()
+            val o = JSONObject()
+            o.put("event_name", name)
+            o.put("schema_version", SCHEMA_VERSION)
+            o.put("timestamp", isoUtc(now))
+            o.put("session_id", sessionId())
+            o.put("platform", PLATFORM)
+            o.put("app_version", appVersion(c))
+            o.put("os", osName())
+            o.put("device_model", deviceModel())
+            o.put("network_type", networkType(c))
+            o.put("screen_or_route", currentScreen)
+            o.put("log_level", level)
+            o.put("release_channel", RELEASE_CHANNEL)
+
+            for ((k, v) in props) {
+                if (v == null) continue
+                when (v) {
+                    is Int -> o.put(k, v)
+                    is Long -> o.put(k, v)
+                    is Boolean -> o.put(k, v)
+                    is Double -> o.put(k, v)
+                    is Float -> o.put(k, v.toDouble())
+                    else -> o.put(k, redact(v.toString()))
+                }
+            }
+
+            val line = o.toString()
             val f = file(c)
             synchronized(lock) {
                 if (f.length() > MAX_BYTES) f.delete()
-                f.appendText(
-                    System.currentTimeMillis().toString() + "\t" + level + "\t" +
-                        tag.replace('\t', ' ') + "\t" + escape(message) + "\n"
-                )
+                f.appendText(line + "\n")
             }
         }
     }
 
-    // -------------------------------------------------------------- reading
+    // --------------------------------------------------------------- reading
     fun sizeBytes(c: Context): Long = runCatching { file(c).length() }.getOrDefault(0L)
 
-    /** The most recent records, oldest first. Never throws. */
-    fun entries(c: Context): List<Entry> = runCatching {
+    /** The raw JSON lines, for an exact structured export. */
+    fun rawEvents(c: Context): List<String> = tail(c).mapNotNull { raw ->
+        runCatching { JSONObject(raw) }.getOrNull()?.let { raw }
+    }
+
+    /** The same records, parsed for display and for the spreadsheet export. */
+    fun entries(c: Context): List<Event> {
+        val out = ArrayList<Event>()
+        for (raw in rawEvents(c)) {
+            val o = runCatching { JSONObject(raw) }.getOrNull() ?: continue
+            val name = o.optString("event_name", "")
+            if (name.isEmpty()) continue
+            val time = parseIso(o.optString("timestamp", "")) ?: 0L
+            val level = o.optString("log_level", "info")
+            val props = LinkedHashMap<String, String>()
+            val keys = o.keys()
+            while (keys.hasNext()) {
+                val k = keys.next()
+                if (k in ENVELOPE) continue
+                props[k] = o.optString(k, "")
+            }
+            out.add(
+                Event(
+                    name, time, level,
+                    o.optString("screen_or_route", "—"),
+                    o.optString("session_id", ""),
+                    props
+                )
+            )
+        }
+        return out
+    }
+
+    fun clear(c: Context) {
+        val before = entries(c).size
+        runCatching { file(c).writeText("") }
+        Events.diagnosticsAction(c, "clean", null, null, null, before)
+    }
+
+    private fun tail(c: Context): List<String> = runCatching {
         val f = file(c)
         if (!f.exists() || f.length() == 0L) return@runCatching emptyList()
-
-        // Read the tail only, so a huge log cannot exhaust memory.
-        val maxBytes = 512L * 1024L
         val len = f.length()
-        val skip = if (len > maxBytes) len - maxBytes else 0L
+        val skip = if (len > MAX_BYTES) len - MAX_BYTES else 0L
         val text = RandomAccessFile(f, "r").use { raf ->
             raf.seek(skip)
             val buf = ByteArray((len - skip).toInt())
             raf.readFully(buf)
             String(buf, Charsets.UTF_8)
         }
-        // Drop the partial first line when we started mid-file.
         val body = if (skip > 0L) text.substringAfter('\n', "") else text
-
-        val out = ArrayList<Entry>()
-        for (raw in body.split('\n')) {
-            if (raw.isEmpty()) continue
-            val parts = raw.split('\t')
-            if (parts.size < 4) continue
-            val time = parts[0].toLongOrNull() ?: continue
-            out.add(Entry(time, parts[1], parts[2], unescape(parts.subList(3, parts.size).joinToString("\t"))))
-        }
-        if (out.size > MAX_READ) out.subList(out.size - MAX_READ, out.size) else out
+        val lines = body.split('\n').filter { it.isNotBlank() }
+        if (lines.size > MAX_READ) lines.subList(lines.size - MAX_READ, lines.size) else lines
     }.getOrDefault(emptyList())
 
-    fun clear(c: Context) {
-        runCatching { file(c).writeText("") }
-        info(c, "diagnostics", "Log cleared by the user")
+    // ------------------------------------------------------------ retention
+    /** Drops records older than the retention window. */
+    private fun prune(c: Context) {
+        runCatching {
+            val f = file(c)
+            if (!f.exists() || f.length() == 0L) return@runCatching
+            val cutoff = System.currentTimeMillis() - RETENTION_DAYS * 24L * 60L * 60L * 1000L
+            val kept = ArrayList<String>()
+            var dropped = 0
+            for (line in f.readLines()) {
+                if (line.isBlank()) continue
+                val t = runCatching { JSONObject(line) }.getOrNull()
+                    ?.let { parseIso(it.optString("timestamp", "")) } ?: 0L
+                if (t in 1L until cutoff) dropped++ else kept.add(line)
+            }
+            if (dropped > 0) {
+                f.writeText(if (kept.isEmpty()) "" else kept.joinToString("\n") + "\n")
+            }
+        }
     }
 
-    // -------------------------------------------------------------- crashes
+    // -------------------------------------------------------------- watchdog
+    /** Watches the main thread so a freeze is recorded as an event, not a rumour. */
+    fun startWatch(c: Context) {
+        if (watchRunnable != null) return
+        lastTick = System.currentTimeMillis()
+        val r = object : Runnable {
+            override fun run() {
+                val now = System.currentTimeMillis()
+                val gap = now - lastTick
+                lastTick = now
+                if (gap > STALL_MS) {
+                    val ctx = appContext
+                    if (ctx != null) Events.anr(ctx, gap, currentScreen)
+                }
+                watchHandler.postDelayed(this, TICK_MS)
+            }
+        }
+        watchRunnable = r
+        watchHandler.postDelayed(r, TICK_MS)
+    }
+
+    fun stopWatch() {
+        watchRunnable?.let { watchHandler.removeCallbacks(it) }
+        watchRunnable = null
+    }
+
+    // --------------------------------------------------------------- crashes
     private fun hookCrashes() {
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
@@ -145,14 +361,24 @@ object Diag {
                 runCatching {
                     val sw = StringWriter()
                     throwable.printStackTrace(PrintWriter(sw))
-                    write(ctx, "FATAL", "crash", "Uncaught on ${thread.name}\n$sw")
+                    Events.crash(
+                        ctx,
+                        throwable.javaClass.name,
+                        hash(sw.toString()),
+                        currentScreen,
+                        lastAction,
+                        thread.name
+                    )
                 }
             }
             previous?.uncaughtException(thread, throwable)
         }
     }
 
-    // ------------------------------------------------------------- helpers
+    // ---------------------------------------------------------------- values
+    fun appVersion(c: Context): String =
+        versionName(c) + " (" + versionCode(c) + ")"
+
     fun versionName(c: Context): String = runCatching {
         c.packageManager.getPackageInfo(c.packageName, 0).versionName ?: "?"
     }.getOrDefault("?")
@@ -160,39 +386,65 @@ object Diag {
     @Suppress("DEPRECATION")
     fun versionCode(c: Context): Long = runCatching {
         val info = c.packageManager.getPackageInfo(c.packageName, 0)
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             info.longVersionCode
         } else {
             info.versionCode.toLong()
         }
     }.getOrDefault(0L)
 
+    private fun osName(): String =
+        "Android " + Build.VERSION.RELEASE + " (API " + Build.VERSION.SDK_INT + ")"
+
+    private fun deviceModel(): String = (Build.MANUFACTURER + " " + Build.MODEL).trim()
+
+    private fun networkType(c: Context): String = runCatching {
+        val cm = c.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val caps = cm.activeNetwork?.let { cm.getNetworkCapabilities(it) }
+        when {
+            caps == null -> "offline"
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "wifi"
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "cellular"
+            else -> "offline"
+        }
+    }.getOrDefault("offline")
+
+    // ------------------------------------------------------------- redaction
+    private val emailPattern =
+        Regex("[A-Za-z0-9._%+\\-]+@[A-Za-z0-9.\\-]+\\.[A-Za-z]{2,}")
+    private val digitRun = Regex("\\d{7,}")
+    private val pathPattern = Regex("(?:/[\\w.\\-]+){2,}")
+
+    /** The same rules the web side uses: no email, no long numbers, no paths. */
+    fun redact(value: String): String {
+        var s = emailPattern.replace(value, "[email]")
+        s = digitRun.replace(s, "[number]")
+        s = pathPattern.replace(s, "[path]")
+        return if (s.length > VALUE_CAP) s.substring(0, VALUE_CAP) + "…" else s
+    }
+
+    // --------------------------------------------------------------- helpers
     fun stamp(time: Long): String =
         SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US).format(Date(time))
 
-    private fun escape(s: String): String = s
-        .replace("\\", "\\\\")
-        .replace("\r", "")
-        .replace("\n", "\\n")
-        .replace("\t", "\\t")
+    private fun isoUtc(t: Long): String =
+        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply {
+            timeZone = TimeZone.getTimeZone("UTC")
+        }.format(Date(t))
 
-    private fun unescape(s: String): String {
-        val sb = StringBuilder(s.length)
-        var i = 0
-        while (i < s.length) {
-            val ch = s[i]
-            if (ch == '\\' && i + 1 < s.length) {
-                when (s[i + 1]) {
-                    'n' -> { sb.append('\n'); i += 2 }
-                    't' -> { sb.append('\t'); i += 2 }
-                    '\\' -> { sb.append('\\'); i += 2 }
-                    else -> { sb.append(ch); i++ }
-                }
-            } else {
-                sb.append(ch)
-                i++
-            }
-        }
-        return sb.toString()
-    }
+    private fun parseIso(s: String): Long? = runCatching {
+        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply {
+            timeZone = TimeZone.getTimeZone("UTC")
+        }.parse(s)?.time
+    }.getOrNull()
+
+    private fun shortId(): String =
+        UUID.randomUUID().toString().replace("-", "").take(8)
+
+    private fun hash(s: String): String = runCatching {
+        MessageDigest.getInstance("SHA-256")
+            .digest(s.toByteArray(Charsets.UTF_8))
+            .joinToString("") { String.format(Locale.US, "%02x", it) }
+            .take(12)
+    }.getOrDefault("—")
 }

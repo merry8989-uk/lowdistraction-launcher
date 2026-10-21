@@ -108,6 +108,7 @@ class SettingsActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        Events.screenView(this, "Settings")
         // Reflect the real service state whenever we come back to this screen.
         val toggle = findViewById<Switch>(R.id.bubble_switch)
         toggle.setOnCheckedChangeListener(null)
@@ -121,6 +122,7 @@ class SettingsActivity : Activity() {
         devCheck.isChecked = ShortcutPrefs.isDevCheckEnabled(this)
         devCheck.setOnCheckedChangeListener { _, isChecked ->
             ShortcutPrefs.setDevCheckEnabled(this, isChecked)
+            Events.settingsChanged(this, "devcheck_enabled", isChecked.toString())
         }
 
         val sensitive = findViewById<Switch>(R.id.sensitive_switch)
@@ -128,6 +130,7 @@ class SettingsActivity : Activity() {
         sensitive.isChecked = SensitiveApps.isEnabled(this)
         sensitive.setOnCheckedChangeListener { _, isChecked ->
             SensitiveApps.setEnabled(this, isChecked)
+            Events.settingsChanged(this, "sensitive_enabled", isChecked.toString())
         }
 
         val strict = findViewById<Switch>(R.id.strict_switch)
@@ -135,6 +138,7 @@ class SettingsActivity : Activity() {
         strict.isChecked = SensitiveApps.isStrict(this)
         strict.setOnCheckedChangeListener { _, isChecked ->
             SensitiveApps.setStrict(this, isChecked)
+            Events.settingsChanged(this, "sensitive_strict", isChecked.toString())
         }
 
         val pause = findViewById<Switch>(R.id.pause_switch)
@@ -142,6 +146,7 @@ class SettingsActivity : Activity() {
         pause.isChecked = ShortcutPrefs.isLaunchPauseEnabled(this)
         pause.setOnCheckedChangeListener { _, isChecked ->
             ShortcutPrefs.setLaunchPauseEnabled(this, isChecked)
+            Events.settingsChanged(this, "pause_enabled", isChecked.toString())
         }
 
         val pauseTick = findViewById<Switch>(R.id.pause_tick_switch)
@@ -149,6 +154,7 @@ class SettingsActivity : Activity() {
         pauseTick.isChecked = ShortcutPrefs.isTickSoundEnabled(this)
         pauseTick.setOnCheckedChangeListener { _, isChecked ->
             ShortcutPrefs.setTickSoundEnabled(this, isChecked)
+            Events.settingsChanged(this, "tick_sound", isChecked.toString())
             // Let the switch be heard, so it is obvious what it controls.
             if (isChecked) TimerTick.play(this, urgent = false)
         }
@@ -160,6 +166,7 @@ class SettingsActivity : Activity() {
         diag.isChecked = Diag.isEnabled(this)
         diag.setOnCheckedChangeListener { _, isChecked ->
             Diag.setEnabled(this, isChecked)
+            Events.settingsChanged(this, "diagnostics_enabled", isChecked.toString())
             Toast.makeText(
                 this,
                 if (isChecked) R.string.diag_now_on else R.string.diag_now_off,
@@ -171,7 +178,7 @@ class SettingsActivity : Activity() {
     }
 
     private fun enableBubble() {
-        Diag.info(this, "bubble", "Bubble switched on")
+        Events.bubbleToggled(this, true)
         if (!Settings.canDrawOverlays(this)) {
             Toast.makeText(this, R.string.bubble_need_overlay, Toast.LENGTH_LONG).show()
             startActivity(
@@ -187,7 +194,7 @@ class SettingsActivity : Activity() {
     }
 
     private fun disableBubble() {
-        Diag.info(this, "bubble", "Bubble switched off")
+        Events.bubbleToggled(this, false)
         FloatingBubbleService.stop(this)
     }
 
@@ -275,6 +282,7 @@ class SettingsActivity : Activity() {
             .setTitle(R.string.wheel_sound_title)
             .setSingleChoiceItems(labels, options.indexOf(WheelSound.selected(this))) { dialog, which ->
                 WheelSound.setSelected(this, options[which].id)
+                Events.settingsChanged(this, "wheel_sound", options[which].name)
                 Chime.play(this)
                 findViewById<TextView>(R.id.wheelSoundDesc).text = options[which].name
                 dialog.dismiss()
@@ -444,6 +452,7 @@ class SettingsActivity : Activity() {
             .setPositiveButton(android.R.string.ok) { _, _ ->
                 ShortcutPrefs.setPauseSeconds(this, bar.progress + 1)
                 updatePauseSecondsRow()
+                Events.settingsChanged(this, "pause_seconds", (bar.progress + 1).toString())
                 Toast.makeText(this, R.string.saved, Toast.LENGTH_SHORT).show()
             }
             .setNegativeButton(android.R.string.cancel, null)

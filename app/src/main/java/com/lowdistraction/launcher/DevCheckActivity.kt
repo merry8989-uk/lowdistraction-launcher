@@ -161,6 +161,7 @@ class DevCheckActivity : Activity(), SensorEventListener {
     // --------------------------------------------------------------- lifecycle
     override fun onResume() {
         super.onResume()
+        Events.screenView(this, "Dev.Check")
         if (DeviceInfo.tabs.getOrNull(selectedTab) == SENSORS_TAB) {
             if (valueRowOf.isEmpty()) showSensors()
             else startListening(DeviceInfo.sensorList(this))

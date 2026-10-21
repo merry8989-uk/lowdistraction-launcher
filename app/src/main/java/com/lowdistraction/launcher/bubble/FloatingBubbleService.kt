@@ -21,6 +21,8 @@ import android.widget.ImageView
 import androidx.core.app.NotificationCompat
 import com.lowdistraction.launcher.AppInfo
 import com.lowdistraction.launcher.AppRepository
+import com.lowdistraction.launcher.Diag
+import com.lowdistraction.launcher.Events
 import com.lowdistraction.launcher.MainActivity
 import com.lowdistraction.launcher.R
 import kotlin.math.abs
@@ -205,7 +207,7 @@ class FloatingBubbleService : Service() {
             anchorX = (bubbleParams?.x ?: 0) + dp(28),
             anchorY = (bubbleParams?.y ?: 0) + dp(28),
             apps = loadPinnedApps(),
-            onApp = { launch(it); removeOverlay() },
+            onApp = { launchFromWheel(it); removeOverlay() },
             onRemoveApp = { prefs.remove(it.component.flattenToString()); rebuildMenu() },
             onAddApps = { openAppPicker() },
             onQuickAction = { action ->
@@ -234,6 +236,15 @@ class FloatingBubbleService : Service() {
     private fun rebuildMenu() {
         removeOverlay()
         toggleMenu()
+    }
+
+    /** A launch from the wheel: the same intent→outcome pair, from a different door. */
+    private fun launchFromWheel(app: AppInfo) {
+        val attempt = Diag.newAttempt()
+        Diag.setLastAction("wheel launch " + app.packageName)
+        Events.appLaunchRequested(this, app.packageName, Events.LaunchSource.WHEEL, false, attempt)
+        Events.appLaunchResult(this, app.packageName, attempt, Events.Outcome.SUCCESS, 0L)
+        launch(app)
     }
 
     private fun openAppPicker() {

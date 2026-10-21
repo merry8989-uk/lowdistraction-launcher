@@ -91,9 +91,22 @@ class MainActivity : Activity() {
     private var bgT = 0f
     private var lastBgFrame = 0L
 
+    // Diagnostics: the intent→outcome pair for a launch, plus friction counters.
+    private var pendingAttempt: String? = null
+    private var pendingRequestedAt = 0L
+    private var lastLaunchAt = 0L
+    private var firstValueLogged = false
+    private var backPresses = 0
+    private var firstBackAt = 0L
+    private var rageTarget = -1
+    private var rageCount = 0
+    private var rageWindowStart = 0L
+    private val searchLogHandler = Handler(Looper.getMainLooper())
+    private var searchLogRunnable: Runnable? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Diag.install(this)
+        val startedAt = System.currentTimeMillis()
         setContentView(R.layout.activity_main)
 
         hiddenApps = HiddenApps(this)
@@ -156,6 +169,10 @@ class MainActivity : Activity() {
             startActivity(Intent(this, GuideActivity::class.java))
         }
         loadApps()
+
+        // One launch is one session: the first Activity start creates it, a later
+        // one is a warm start that keeps the same session id.
+        Diag.startSession(this, Diag.coldStartMs(), System.currentTimeMillis() - startedAt)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -167,6 +184,8 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        Events.screenView(this, SCREEN_HOME)
+        Diag.startWatch(this)
         // We are the launcher, so by definition nothing sensitive is in front.
         AssistiveTouchService.clearSensitive()
         if (allApps.isNotEmpty()) loadApps()
@@ -333,12 +352,31 @@ class MainActivity : Activity() {
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
+    /** Three taps on the same row inside two seconds is a rage tap. */
+    private fun trackRageTap(position: Int) {
+        val now = System.currentTimeMillis()
+        if (position == rageTarget && now - rageWindowStart < 2000L) {
+            rageCount++
+            if (rageCount == 3) {
+                Events.rageTap(this, "app_row", rageCount, now - rageWindowStart)
+            }
+        } else {
+            rageTarget = position
+            rageCount = 1
+            rageWindowStart = now
+        }
+    }
+
     override fun onPause() {
         super.onPause()
         autoOpenHandler.removeCallbacksAndMessages(null)
         quickHandler.removeCallbacksAndMessages(null)
         cancelGate()
         stopBackgroundDrift()
+        Diag.stopWatch()
+        // Leaving the launcher without opening anything is a drop-off; leaving
+        // because an app was just opened is not.
+        if (System.currentTimeMillis() - lastLaunchAt > 2000L) Diag.endSession(this)
     }
 
     override fun onDestroy() {
@@ -409,7 +447,9 @@ class MainActivity : Activity() {
     // ----------------------------------------------------------- app search
     private fun loadApps() {
         Thread {
+            val t0 = System.currentTimeMillis()
             val apps = AppRepository.loadApps(this)
+            val took = System.currentTimeMillis() - t0
             runOnUiThread {
                 allApps = apps
                 // A fresh app list may include new apps, so sizes are re-read.
@@ -417,6 +457,10 @@ class MainActivity : Activity() {
                 sizesAttempted = false
                 if (quickFind.text.isNullOrEmpty()) filter(search.text?.toString().orEmpty())
                 renderPinned()
+                Events.appListLoaded(
+                    this, apps.size, took,
+                    hiddenApps.all().size, SortPrefs.mode(this).name
+                )
             }
         }.start()
     }
@@ -442,8 +486,32 @@ class MainActivity : Activity() {
 
         if (q.isNotEmpty() && filtered.size == 1) {
             val target = filtered.first()
-            autoOpenHandler.postDelayed({ requestLaunch(target) }, AUTO_OPEN_DELAY_MS)
+            autoOpenHandler.postDelayed(
+                { requestLaunch(target, Events.LaunchSource.SEARCH) }, AUTO_OPEN_DELAY_MS
+            )
         }
+
+        logSearchQuery(q, filtered.size)
+    }
+
+    /**
+     * Records what a search returned — only the query's length, never the query.
+     * Debounced, so typing a word is one event rather than one per keystroke.
+     */
+    private fun logSearchQuery(query: String, resultCount: Int) {
+        searchLogRunnable?.let { searchLogHandler.removeCallbacks(it) }
+        if (query.isEmpty()) return
+        val runnable = Runnable {
+            if (resultCount == 0) {
+                Events.searchNoResults(this, query.length, Events.SearchSource.APPS)
+            } else {
+                Events.searchPerformed(
+                    this, query.length, resultCount, Events.SearchSource.APPS
+                )
+            }
+        }
+        searchLogRunnable = runnable
+        searchLogHandler.postDelayed(runnable, 700L)
     }
 
     private fun handleSearchAction(actionId: Int): Boolean {
@@ -464,7 +532,15 @@ class MainActivity : Activity() {
      * Every app opening goes through here: a seven-second breather first, which
      * opens the app if it runs out and cancels if the user taps anywhere.
      */
-    private fun requestLaunch(app: AppInfo) {
+    private fun requestLaunch(app: AppInfo, source: Events.LaunchSource = Events.LaunchSource.LIST) {
+        val attempt = Diag.newAttempt()
+        pendingAttempt = attempt
+        pendingRequestedAt = System.currentTimeMillis()
+        Diag.setLastAction("launch " + app.packageName)
+        Events.appLaunchRequested(
+            this, app.packageName, source,
+            ShortcutPrefs.isLaunchPauseEnabled(this), attempt
+        )
         if (!ShortcutPrefs.isLaunchPauseEnabled(this)) {
             launch(app)
             return
@@ -602,10 +678,19 @@ class MainActivity : Activity() {
     }
 
     private fun announceCancel(app: AppInfo) {
-        Diag.info(this, "pause", "Cancelled: " + app.label)
+        Events.appLaunchResult(
+            this, app.packageName, pendingAttempt, Events.Outcome.CANCELLED, waitedMs()
+        )
+        pendingAttempt = null
+        pendingRequestedAt = 0L
+        Diag.setLastAction("cancelled " + app.packageName)
         Toast.makeText(this, getString(R.string.pause_cancelled, app.label), Toast.LENGTH_SHORT)
             .show()
     }
+
+    /** How long the user waited on the breather, in milliseconds. */
+    private fun waitedMs(): Long =
+        if (pendingRequestedAt == 0L) 0L else System.currentTimeMillis() - pendingRequestedAt
 
     private fun cancelGate() {
         gateFinished = true
@@ -728,7 +813,17 @@ class MainActivity : Activity() {
     }
 
     private fun launch(app: AppInfo) {
-        Diag.info(this, "launch", "Opened " + app.label)
+        lastLaunchAt = System.currentTimeMillis()
+        Events.appLaunchResult(
+            this, app.packageName, pendingAttempt, Events.Outcome.SUCCESS, waitedMs()
+        )
+        if (!firstValueLogged) {
+            firstValueLogged = true
+            Events.timeToFirstValue(this, "first_app_opened", Diag.sessionDurationMs())
+        }
+        pendingAttempt = null
+        pendingRequestedAt = 0L
+        Diag.setLastAction("opened " + app.packageName)
         AppUsage.record(this, app.component.flattenToString())
         val intent = Intent(Intent.ACTION_MAIN).apply {
             addCategory(Intent.CATEGORY_LAUNCHER)
@@ -1012,6 +1107,17 @@ class MainActivity : Activity() {
                 }
                 return false
             }
+
+            override fun onSingleTapUp(e: MotionEvent): Boolean {
+                val child = list.findChildViewUnder(e.x, e.y)
+                if (child == null) {
+                    // A tap on empty space does nothing at all.
+                    Events.deadClick(this@MainActivity, "home_empty")
+                } else {
+                    trackRageTap(list.getChildAdapterPosition(child))
+                }
+                return false
+            }
         })
 
         list.addOnItemTouchListener(object : RecyclerView.SimpleOnItemTouchListener() {
@@ -1065,6 +1171,16 @@ class MainActivity : Activity() {
 
     @Deprecated("Launcher home; back should not exit the app list")
     override fun onBackPressed() {
+        val now = System.currentTimeMillis()
+        if (now - firstBackAt > 2000L) {
+            firstBackAt = now
+            backPresses = 1
+        } else {
+            backPresses++
+            if (backPresses == 3) {
+                Events.backButtonSpam(this, backPresses, now - firstBackAt, SCREEN_HOME)
+            }
+        }
         if (quickFind.visibility == View.VISIBLE && quickFind.text.isNotEmpty()) {
             quickFind.setText("")
         } else if (search.text.isNotEmpty()) {
@@ -1074,6 +1190,7 @@ class MainActivity : Activity() {
 
     companion object {
         const val EXTRA_PICK_APPS = "pick_apps"
+        private const val SCREEN_HOME = "Home"
         private const val PREFS = "launcher_prefs"
         private const val KEY_PROMPT_SHOWN = "default_prompt_shown"
         private const val SWIPE_MIN = 100f

@@ -1,0 +1,445 @@
+{
+  "schema_version": "1.0.0",
+  "title": "Low Distraction — diagnostics event schema",
+  "description": "One structured schema for every event the launcher records. Modelled on the shared ProGallery logging standard so app and web data can be joined. Bump schema_version on any breaking change.",
+  "envelope": {
+    "required": [
+      "event_name",
+      "schema_version",
+      "timestamp",
+      "session_id",
+      "platform",
+      "app_version",
+      "os",
+      "device_model",
+      "screen_or_route",
+      "log_level"
+    ],
+    "optional": [
+      "attempt_id",
+      "network_type",
+      "release_channel"
+    ],
+    "omitted": {
+      "user_id": "The app has no accounts and no sign-in, so there is no identifier to hash. Nothing is sent in its place."
+    }
+  },
+  "enums": {
+    "log_level": [
+      "debug",
+      "info",
+      "warn",
+      "error"
+    ],
+    "platform": [
+      "android"
+    ],
+    "release_channel": [
+      "production",
+      "beta"
+    ],
+    "network_type": [
+      "wifi",
+      "cellular",
+      "offline"
+    ],
+    "start_type": [
+      "cold",
+      "warm"
+    ],
+    "permission_state": [
+      "granted",
+      "partial",
+      "denied",
+      "permanently_denied",
+      "not_applicable"
+    ],
+    "outcome": [
+      "success",
+      "no_op",
+      "failed",
+      "cancelled"
+    ],
+    "launch_source": [
+      "list",
+      "pinned",
+      "wheel",
+      "search",
+      "hidden"
+    ],
+    "export_format": [
+      "txt",
+      "md",
+      "json",
+      "csv"
+    ],
+    "export_channel": [
+      "save",
+      "share",
+      "email"
+    ],
+    "diagnostics_action": [
+      "export",
+      "share",
+      "email",
+      "clean",
+      "toggle",
+      "refresh"
+    ],
+    "search_source": [
+      "apps",
+      "settings",
+      "contacts",
+      "calendar",
+      "files",
+      "devcheck"
+    ],
+    "tea_action": [
+      "start",
+      "end",
+      "ended_early"
+    ]
+  },
+  "events": {
+    "session_start": {
+      "level": "info",
+      "when": "App cold or warm start",
+      "required": [
+        "start_type"
+      ],
+      "optional": [
+        "cold_start_ms",
+        "warm_start_ms"
+      ]
+    },
+    "drop_off": {
+      "level": "info",
+      "when": "The last event before the app leaves the foreground",
+      "required": [
+        "last_screen",
+        "last_event"
+      ],
+      "optional": [
+        "duration_ms"
+      ]
+    },
+    "screen_view": {
+      "level": "info",
+      "when": "A screen is shown",
+      "required": [
+        "screen_name",
+        "previous_screen"
+      ],
+      "optional": [
+        "duration_ms"
+      ]
+    },
+    "permission_state_resolved": {
+      "level": "info",
+      "when": "After checking whether a feature holds its permission",
+      "required": [
+        "permission",
+        "state"
+      ],
+      "optional": [
+        "item_count"
+      ]
+    },
+    "access_fix_requested": {
+      "level": "info",
+      "when": "The user asks for a permission to be fixed or granted",
+      "required": [
+        "permission",
+        "state_before",
+        "attempt_id"
+      ],
+      "optional": [
+        "action_taken"
+      ]
+    },
+    "access_fix_result": {
+      "level": "info",
+      "when": "The fix attempt finishes — the outcome half of the pair above",
+      "required": [
+        "attempt_id",
+        "outcome"
+      ],
+      "optional": [
+        "action_taken",
+        "state_after",
+        "error_code"
+      ]
+    },
+    "media_query_result": {
+      "level": "info",
+      "when": "After walking storage for a file search",
+      "required": [
+        "source",
+        "item_count",
+        "query_ms"
+      ],
+      "optional": [
+        "folders_visible"
+      ]
+    },
+    "app_list_loaded": {
+      "level": "info",
+      "when": "The home list has been built",
+      "required": [
+        "item_count",
+        "query_ms"
+      ],
+      "optional": [
+        "hidden_count",
+        "sort_mode"
+      ]
+    },
+    "app_launch_requested": {
+      "level": "info",
+      "when": "The user taps an app — the intent half of the launch pair",
+      "required": [
+        "package",
+        "source"
+      ],
+      "optional": [
+        "pause_enabled",
+        "attempt_id"
+      ]
+    },
+    "app_launch_result": {
+      "level": "info",
+      "when": "The launch finishes: opened, cancelled at the pause, or failed",
+      "required": [
+        "package",
+        "outcome"
+      ],
+      "optional": [
+        "attempt_id",
+        "waited_ms"
+      ]
+    },
+    "search_performed": {
+      "level": "info",
+      "when": "A search runs. The query itself is never recorded",
+      "required": [
+        "query_length",
+        "result_count",
+        "source"
+      ],
+      "optional": []
+    },
+    "search_no_results": {
+      "level": "info",
+      "when": "A search returns nothing",
+      "required": [
+        "query_length",
+        "source"
+      ],
+      "optional": [
+        "filters"
+      ]
+    },
+    "settings_changed": {
+      "level": "info",
+      "when": "The user changes a setting",
+      "required": [
+        "setting"
+      ],
+      "optional": [
+        "value"
+      ]
+    },
+    "diagnostics_action": {
+      "level": "info",
+      "when": "The diagnostics screen is used",
+      "required": [
+        "action"
+      ],
+      "optional": [
+        "format",
+        "channel",
+        "bytes",
+        "entries",
+        "value"
+      ]
+    },
+    "bubble_toggled": {
+      "level": "info",
+      "when": "The assistive bubble is switched on or off",
+      "required": [
+        "enabled"
+      ],
+      "optional": []
+    },
+    "guide_step": {
+      "level": "info",
+      "when": "A step of the first-run guide is shown",
+      "required": [
+        "step",
+        "total"
+      ],
+      "optional": []
+    },
+    "guide_finished": {
+      "level": "info",
+      "when": "The guide is completed or skipped",
+      "required": [
+        "steps_seen"
+      ],
+      "optional": [
+        "skipped"
+      ]
+    },
+    "tea_mode": {
+      "level": "info",
+      "when": "The five-minute break starts or ends",
+      "required": [
+        "action"
+      ],
+      "optional": [
+        "duration_ms"
+      ]
+    },
+    "performance_marker": {
+      "level": "info",
+      "when": "A key flow completes",
+      "required": [
+        "flow",
+        "duration_ms"
+      ],
+      "optional": [
+        "frame_drops"
+      ]
+    },
+    "error_state_shown": {
+      "level": "warn",
+      "when": "An error message is put in front of the user",
+      "required": [
+        "error_code",
+        "screen"
+      ],
+      "optional": [
+        "message_key"
+      ]
+    },
+    "crash": {
+      "level": "error",
+      "when": "An uncaught exception",
+      "required": [
+        "fatal",
+        "exception_type"
+      ],
+      "optional": [
+        "stack_trace_hash",
+        "last_screen",
+        "last_action",
+        "thread"
+      ]
+    },
+    "anr": {
+      "level": "warn",
+      "when": "The main thread was blocked long enough to be felt",
+      "required": [
+        "duration_ms"
+      ],
+      "optional": [
+        "last_screen"
+      ]
+    },
+    "rage_tap": {
+      "level": "warn",
+      "when": "Three or more taps on the same thing inside two seconds",
+      "required": [
+        "target",
+        "taps",
+        "window_ms"
+      ],
+      "optional": []
+    },
+    "dead_click": {
+      "level": "info",
+      "when": "A tap that changed nothing at all",
+      "required": [
+        "target"
+      ],
+      "optional": []
+    },
+    "permission_loop": {
+      "level": "warn",
+      "when": "The same permission fix is asked for three times in one session",
+      "required": [
+        "permission",
+        "attempts"
+      ],
+      "optional": []
+    },
+    "back_button_spam": {
+      "level": "warn",
+      "when": "Three or more back presses inside two seconds",
+      "required": [
+        "presses",
+        "window_ms"
+      ],
+      "optional": [
+        "screen"
+      ]
+    },
+    "scroll_depth": {
+      "level": "info",
+      "when": "A scrollable list reaches a new depth",
+      "required": [
+        "percent",
+        "screen"
+      ],
+      "optional": []
+    },
+    "time_to_first_value": {
+      "level": "info",
+      "when": "From session start to the first meaningful action",
+      "required": [
+        "flow",
+        "duration_ms"
+      ],
+      "optional": []
+    }
+  },
+  "not_applicable": {
+    "api_request": "The app has no INTERNET permission, so it makes no network calls and can never log one.",
+    "page_view": "Web-only event.",
+    "web_vitals": "Web-only event.",
+    "js_error": "Web-only event.",
+    "form_start": "Web-only event.",
+    "form_abandon": "Web-only event.",
+    "form_submit": "Web-only event.",
+    "conversion": "Web-only event.",
+    "feedback_submitted": "Web-only event.",
+    "session_replay_marker": "No session replay is recorded anywhere in the app.",
+    "user_id": "No accounts, so no identifier — not even a hashed one."
+  },
+  "privacy": {
+    "never_logged": [
+      "email addresses",
+      "phone numbers",
+      "names",
+      "exact location",
+      "raw file paths",
+      "media file names",
+      "raw search queries",
+      "auth tokens",
+      "any identifier of a person"
+    ],
+    "logged_on_purpose": {
+      "package": "The package name of an app the user opened (e.g. com.example.app). It is a public product identifier, not personal data, and a launch problem cannot be debugged without it. The user-visible label is never recorded."
+    },
+    "redaction": [
+      "anything shaped like an email becomes [email]",
+      "long digit runs become [number]",
+      "absolute filesystem paths become [path]",
+      "values are capped at 240 characters"
+    ],
+    "retention_days": 14,
+    "size_cap_bytes": 524288,
+    "opt_out": "Settings → Record diagnostics (on by default). While it is off nothing at all is written.",
+    "transport": "There is no transport. The app cannot reach the network; a report leaves the phone only when the user exports, shares or mails it."
+  }
+}

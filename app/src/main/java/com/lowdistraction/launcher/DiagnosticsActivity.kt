@@ -45,9 +45,14 @@ class DiagnosticsActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Diag.install(this)
+        Diag.installCrashHandler()
         buildUi()
         refresh()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        Events.screenView(this, "Diagnostics")
     }
 
     // ------------------------------------------------------------ screen build
@@ -211,13 +216,14 @@ class DiagnosticsActivity : Activity() {
         }
         summary.text = getString(
             R.string.diag_summary,
-            fresh.log.size,
+            fresh.events.size,
             humanSize(Diag.sizeBytes(this)),
             fresh.crashCount
         )
         toggle.text = getString(
             if (fresh.enabled) R.string.diag_turn_off else R.string.diag_turn_on
         )
+        Events.diagnosticsAction(this, Events.DiagAction.REFRESH, null, null, null, fresh.events.size)
         val text = DiagnosticsReport.renderText(fresh)
         preview.text = if (text.length > PREVIEW_LIMIT) {
             text.substring(0, PREVIEW_LIMIT) + "\n\n… " +
@@ -265,6 +271,11 @@ class DiagnosticsActivity : Activity() {
             .setItems(labels) { _, which ->
                 val ext = FORMATS[which]
                 val text = render(current, ext)
+                Events.diagnosticsAction(
+                    this,
+                    if (share) Events.DiagAction.SHARE else Events.DiagAction.EXPORT,
+                    formatOf(ext), null, text.length.toLong(), current.events.size
+                )
                 if (share) shareText(text, ext) else saveText(text, ext)
             }
             .setNegativeButton(android.R.string.cancel, null)
@@ -276,6 +287,13 @@ class DiagnosticsActivity : Activity() {
         "json" -> DiagnosticsReport.renderJson(r)
         "csv" -> DiagnosticsReport.renderCsv(r)
         else -> DiagnosticsReport.renderText(r)
+    }
+
+    private fun formatOf(ext: String): Events.ExportFormat = when (ext) {
+        "md" -> Events.ExportFormat.MD
+        "json" -> Events.ExportFormat.JSON
+        "csv" -> Events.ExportFormat.CSV
+        else -> Events.ExportFormat.TXT
     }
 
     private fun mime(ext: String): String = when (ext) {
@@ -315,6 +333,10 @@ class DiagnosticsActivity : Activity() {
                 out.flush()
             }
         }.isSuccess
+        Events.diagnosticsAction(
+            this, Events.DiagAction.EXPORT, null, Events.ExportChannel.SAVE,
+            text.length.toLong(), report?.events?.size ?: 0
+        )
         Toast.makeText(
             this,
             if (ok) getString(R.string.diag_saved, pendingName) else getString(R.string.diag_save_failed),
@@ -334,6 +356,10 @@ class DiagnosticsActivity : Activity() {
             Toast.makeText(this, R.string.diag_save_failed, Toast.LENGTH_LONG).show()
             return
         }
+        Events.diagnosticsAction(
+            this, Events.DiagAction.SHARE, formatOf(ext),
+            Events.ExportChannel.SHARE, text.length.toLong(), report?.events?.size ?: 0
+        )
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = mime(ext)
             putExtra(Intent.EXTRA_STREAM, uri)
@@ -348,6 +374,10 @@ class DiagnosticsActivity : Activity() {
     private fun emailReport() {
         val current = report ?: return
         val text = DiagnosticsReport.renderText(current)
+        Events.diagnosticsAction(
+            this, Events.DiagAction.EMAIL, Events.ExportFormat.TXT,
+            Events.ExportChannel.EMAIL, text.length.toLong(), current.events.size
+        )
         val file = writeTemp(text, "txt")
         val uri = file?.let {
             runCatching { FileProvider.getUriForFile(this, packageName + ".files", it) }.getOrNull()

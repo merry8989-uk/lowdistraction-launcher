@@ -42,6 +42,7 @@ class GuideActivity : Activity() {
 
     private fun render() {
         theme = Look.theme(this)
+        Events.guideStep(this, step + 1, stepCount)
         val col = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(24), dp(44), dp(24), dp(32))
@@ -422,8 +423,14 @@ class GuideActivity : Activity() {
     }
 
     private fun finishGuide() {
+        Events.guideFinished(this, step + 1, false)
         ShortcutPrefs.setGuideSeen(this, true)
         finish()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        Events.screenView(this, "Guide")
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()

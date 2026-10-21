@@ -10,6 +10,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # The logging standard is a review gate, not a suggestion: an event that is
+      # not in tools/logging_schema.json, a missing required property, an unknown
+      # property, a wrong log level or a drifted enum fails the build here.
+      - name: Validate the logging schema
+        run: python3 tools/validate_logging.py
+
       - name: Set up JDK 17
         uses: actions/setup-java@v6
         with:

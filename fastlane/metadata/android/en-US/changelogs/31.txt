@@ -1,0 +1,22 @@
+Structured diagnostics: intent, outcome and context together
+
+- The log is now a proper event stream instead of free text. Every record
+  carries a common envelope — schema version, ISO-8601 UTC timestamp, session
+  id, platform, app version, OS, device model, network type, current screen and
+  log level — so a report can actually be reasoned about.
+- User actions come in pairs. Asking for a permission, or tapping an app, now
+  logs an intent and then an outcome, tied together by an attempt id. The
+  report counts anything asked for that never reported back, which is how a
+  stuck loop becomes visible instead of invisible.
+- Friction is recorded as events: rage taps, dead clicks, permission loops,
+  back-button spam, error states, freezes, crashes, scroll depth, time to first
+  action, and how launches actually ended.
+- The report gains Signals and Log health sections, and the exports are
+  sharper: JSON is now one object per event, and CSV is one row per event with
+  every property as a column, ready for Excel or Google Sheets.
+- Privacy is enforced, not promised: emails, long digit runs and filesystem
+  paths are redacted before anything is written; raw search text and file names
+  are never recorded; records are kept 14 days and the file is capped at 512 KB,
+  both applied automatically.
+- A shared schema (tools/logging_schema.json) defines every event, and CI
+  validates the logging against it before the build is allowed to pass.

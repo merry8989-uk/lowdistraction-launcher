@@ -30,6 +30,7 @@ class SortSettingsActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        Events.screenView(this, "Sorting")
         // Usage access may have been granted while we were away.
         buildUi()
     }

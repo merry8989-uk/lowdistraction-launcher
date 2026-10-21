@@ -7,6 +7,7 @@ import android.view.Gravity
 import android.view.WindowManager
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.lowdistraction.launcher.Events
 import com.lowdistraction.launcher.R
 
 /**
@@ -18,9 +19,13 @@ import com.lowdistraction.launcher.R
 class TeaModeActivity : Activity() {
 
     private var timer: CountDownTimer? = null
+    private var startedAt = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        startedAt = System.currentTimeMillis()
+        Events.screenView(this, "Tea mode")
+        Events.teaMode(this, Events.TeaAction.START, null)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         val root = LinearLayout(this).apply {
@@ -79,6 +84,10 @@ class TeaModeActivity : Activity() {
 
     override fun onDestroy() {
         timer?.cancel()
+        Events.teaMode(
+            this, Events.TeaAction.END,
+            if (startedAt == 0L) 0L else System.currentTimeMillis() - startedAt
+        )
         super.onDestroy()
     }
 

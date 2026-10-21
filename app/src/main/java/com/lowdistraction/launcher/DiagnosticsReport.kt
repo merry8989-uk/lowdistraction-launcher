@@ -21,8 +21,8 @@ import java.util.TimeZone
  * Four shapes are offered, because they are good at different things:
  *   .txt   — read it in a mail or a notes app
  *   .md    — read it on GitHub / paste it into an issue
- *   .json  — feed it to a tool
- *   .csv   — open the log as a table in Excel or Google Sheets
+ *   .json  — the exact structured records, one object per event
+ *   .csv   — one row per event, columns unioned, for Excel or Google Sheets
  */
 object DiagnosticsReport {
 
@@ -39,28 +39,36 @@ object DiagnosticsReport {
         val version: String,
         val versionCode: Long,
         val enabled: Boolean,
+        val schemaVersion: String,
         val sections: List<Section>,
-        val log: List<Diag.Entry>
+        val events: List<Diag.Event>,
+        val rawEvents: List<String>
     ) {
-        val logBytes: Long get() = log.sumOf { it.message.length.toLong() }
-        val crashCount: Int get() = log.count { it.level == "FATAL" }
+        val crashCount: Int get() = events.count { it.name == "crash" }
+        val sessions: Int get() = events.count { it.name == "session_start" }
     }
 
     // ------------------------------------------------------------- collecting
     fun collect(context: Context): Report {
+        val events = Diag.entries(context)
         val sections = ArrayList<Section>()
         sections.add(Section("App", appRows(context)))
         sections.add(Section("Device", deviceRows(context)))
         sections.add(Section("Launcher settings", settingsRows(context)))
         sections.add(Section("Permissions", permissionRows(context)))
+        sections.add(Section("Signals", signalRows(events)))
+        sections.add(Section("Log health", healthRows(events)))
+        sections.add(Section("Privacy", privacyRows()))
         return Report(
             generatedAt = System.currentTimeMillis(),
             appName = "Low Distraction",
             version = Diag.versionName(context),
             versionCode = Diag.versionCode(context),
             enabled = Diag.isEnabled(context),
+            schemaVersion = Diag.SCHEMA_VERSION,
             sections = sections,
-            log = Diag.entries(context)
+            events = events,
+            rawEvents = Diag.rawEvents(context)
         )
     }
 
@@ -70,30 +78,28 @@ object DiagnosticsReport {
         add(Row("Version", Diag.versionName(c) + " (" + Diag.versionCode(c) + ")"))
         add(Row("Build", if (isDebuggable(c)) "debug" else "release"))
         add(Row("Diagnostics", if (Diag.isEnabled(c)) "on" else "off"))
-        add(Row("Log size", humanSize(Diag.sizeBytes(c)) + ", " + Diag.entries(c).size + " records"))
-        add(Row("Generated", isoLocal(System.currentTimeMillis())))
-        add(Row("Locale", Locale.getDefault().toString()))
+        add(Row("Log schema", Diag.SCHEMA_VERSION))
+        add(Row("Log size", humanSize(Diag.sizeBytes(c)) + ", " + Diag.entries(c).size + " events"))
+        add(Row("Session", Diag.sessionId()))
+        add(Row("Generated", local(System.currentTimeMillis())))
         add(Row("Timezone", TimeZone.getDefault().id))
+        add(Row("Locale", Locale.getDefault().toString()))
         add(Row("Screen", screenSummary(c)))
     }
 
     private fun deviceRows(c: Context): List<Row> {
         val out = ArrayList<Row>()
-        // Reuse the Dev.Check collectors so the report matches what the device
-        // window shows. Anything a tab cannot read is already caught there.
+        // Reuse the Dev.Check collectors so the report matches the device window.
         for (tab in listOf("Hardware", "System", "Battery", "Network")) {
             out.add(Row(tab.uppercase(Locale.US), ""))
-            for (r in DeviceInfo.rows(c, tab)) {
-                out.add(Row(r.label, r.value))
-            }
+            for (r in DeviceInfo.rows(c, tab)) out.add(Row(r.label, r.value))
         }
         return out
     }
 
     private fun settingsRows(c: Context): List<Row> {
-        val theme = Look.theme(c)
         val out = ArrayList<Row>()
-        out.add(Row("Theme", theme.name + " (" + Look.themeId(c) + ")"))
+        out.add(Row("Theme", Look.theme(c).name + " (" + Look.themeId(c) + ")"))
         out.add(Row("Display mode", Look.displayMode(c).name))
         out.add(Row("Icon size", Look.iconSize(c).toString()))
         out.add(Row("Icon shape", Look.iconShape(c).name))
@@ -128,7 +134,7 @@ object DiagnosticsReport {
         out.add(Row("Search: contacts", SearchSources.contacts(c).toString()))
         out.add(Row("Search: calendar", SearchSources.calendar(c).toString()))
         out.add(Row("Search: files", SearchSources.files(c).toString()))
-        out.add(Row("Search: Dev.Check", SearchSources.devCheck(c).toString()))
+        out.add(Row("Search: devcheck", SearchSources.devCheck(c).toString()))
         out.add(Row("Guide seen", ShortcutPrefs.isGuideSeen(c).toString()))
         return out
     }
@@ -145,20 +151,94 @@ object DiagnosticsReport {
         add(Row("Notifications", granted(notifications(c))))
     }
 
+    // --------------------------------------------------------- user-friendliness
+    /** The friction signals the shared standard asks for, counted. */
+    private fun signalRows(events: List<Diag.Event>): List<Row> {
+        fun count(name: String) = events.count { it.name == name }
+        val out = ArrayList<Row>()
+        out.add(Row("Sessions in log", count("session_start").toString()))
+        out.add(Row("Rage taps", count("rage_tap").toString()))
+        out.add(Row("Dead clicks", count("dead_click").toString()))
+        out.add(Row("Permission loops", count("permission_loop").toString()))
+        out.add(Row("Back-button spam", count("back_button_spam").toString()))
+        out.add(Row("Errors shown", count("error_state_shown").toString()))
+        out.add(Row("Freezes (anr)", count("anr").toString()))
+        out.add(Row("Crashes", count("crash").toString()))
+
+        val depths = events.filter { it.name == "scroll_depth" }
+            .mapNotNull { it.props["percent"]?.toIntOrNull() }
+        out.add(Row("Deepest scroll", if (depths.isEmpty()) "—" else depths.max().toString() + "%"))
+
+        val ttfv = events.lastOrNull { it.name == "time_to_first_value" }
+            ?.props?.get("duration_ms")
+        out.add(Row("Time to first action", ttfv?.let { it + " ms" } ?: "—"))
+
+        val drops = events.filter { it.name == "drop_off" }
+        out.add(Row("Session ends logged", drops.size.toString()))
+        if (drops.isNotEmpty()) {
+            out.add(Row("Last screen seen", drops.last().props["last_screen"] ?: "—"))
+        }
+
+        val launches = events.filter { it.name == "app_launch_result" }
+        out.add(Row("Apps opened", launches.count { it.props["outcome"] == "success" }.toString()))
+        out.add(Row("Stopped at the pause", launches.count { it.props["outcome"] == "cancelled" }.toString()))
+        out.add(Row("Launch failures", launches.count { it.props["outcome"] == "failed" }.toString()))
+        return out
+    }
+
+    /**
+     * The rule the standard exists for: a log must capture intent *and* outcome.
+     * Anything requested without a matching result is called out here.
+     */
+    private fun healthRows(events: List<Diag.Event>): List<Row> {
+        fun pair(intent: String, result: String, label: String): List<Row> {
+            val intents = events.count { it.name == intent }
+            val results = events.count { it.name == result }
+            val unmatched = (intents - results).coerceAtLeast(0)
+            return listOf(
+                Row("$label intents", intents.toString()),
+                Row("$label outcomes", results.toString()),
+                Row("$label unmatched", if (unmatched == 0) "0 — every intent has an outcome" else unmatched.toString())
+            )
+        }
+        val out = ArrayList<Row>()
+        out.addAll(pair("access_fix_requested", "access_fix_result", "Permission fix"))
+        out.addAll(pair("app_launch_requested", "app_launch_result", "App launch"))
+        val ids = events.mapNotNull { it.props["attempt_id"] }.toSet()
+        out.add(Row("Distinct attempts", ids.size.toString()))
+        out.add(Row("Event types seen", events.map { it.name }.toSet().size.toString()))
+        return out
+    }
+
+    private fun privacyRows(): List<Row> = buildList {
+        add(Row("Never logged", "email, phone, names, location, raw file paths"))
+        add(Row("Never logged", "media file names, raw search queries, auth tokens"))
+        add(Row("Search queries", "only the length is recorded, never the text"))
+        add(Row("Redaction", "email → [email], long numbers → [number], paths → [path]"))
+        add(Row("User identifier", "none — the app has no accounts, not even a hash"))
+        add(Row("Retention", "14 days, pruned automatically on start"))
+        add(Row("Size cap", "512 KB, rotated automatically"))
+        add(Row("Sampling", "high-volume info events 1 in 5; errors always kept"))
+        add(Row("Transport", "none — the app cannot reach the network at all"))
+        add(Row("Opt-out", "Settings → Record diagnostics"))
+    }
+
     // ------------------------------------------------------------- rendering
     fun renderText(r: Report): String {
         val sb = StringBuilder()
         sb.append("LOW DISTRACTION — DIAGNOSTICS\n")
-        sb.append("Version ").append(r.version).append(" (").append(r.versionCode).append(")\n")
+        sb.append("Version ").append(r.version).append(" (").append(r.versionCode).append(")")
+        sb.append("   schema ").append(r.schemaVersion).append("\n")
         sb.append("Generated ").append(local(r.generatedAt)).append("\n")
         sb.append("Diagnostics ").append(if (r.enabled) "on" else "off")
-        sb.append("  ·  ").append(r.log.size).append(" log records\n")
-        sb.append("=".repeat(64)).append("\n\n")
+        sb.append("  ·  ").append(r.events.size).append(" events")
+        sb.append("  ·  ").append(r.sessions).append(" sessions")
+        sb.append("  ·  ").append(r.crashCount).append(" crashes\n")
+        sb.append("=".repeat(70)).append("\n\n")
 
         for (section in r.sections) {
             sb.append("[").append(section.title.uppercase(Locale.US)).append("]\n")
-            val width = section.rows.filter { it.value.isNotEmpty() }
-                .maxOfOrNull { it.key.length } ?: 0
+            val width = section.rows.filter { it.value.isNotEmpty() }.maxOfOrNull { it.key.length } ?: 0
             for (row in section.rows) {
                 if (row.value.isEmpty()) {
                     sb.append("  ").append(row.key).append("\n")
@@ -169,29 +249,34 @@ object DiagnosticsReport {
             sb.append("\n")
         }
 
-        sb.append("[LOG — ").append(r.log.size).append(" records]\n")
-        if (r.log.isEmpty()) {
+        sb.append("[EVENTS — ").append(r.events.size).append("]\n")
+        if (r.events.isEmpty()) {
             sb.append("  (nothing recorded yet)\n")
         } else {
-            for (e in r.log) {
+            for (e in r.events) {
                 sb.append(Diag.stamp(e.time)).append("  ").append(e.level.padEnd(5)).append(" ")
-                    .append(e.tag).append(": ").append(e.message).append("\n")
+                    .append(e.name)
+                for ((k, v) in e.props) sb.append("  ").append(k).append('=').append(v)
+                sb.append("\n")
             }
         }
         sb.append("\n")
-        sb.append("Note: Low Distraction has no internet permission at all. This\n")
-        sb.append("report was written on the device and only leaves it because you\n")
-        sb.append("chose to export or send it.\n")
+        sb.append("Note: Low Distraction has no internet permission at all. This report\n")
+        sb.append("was written on the device and only leaves it because you chose to\n")
+        sb.append("export or send it.\n")
         return sb.toString()
     }
 
     fun renderMarkdown(r: Report): String {
         val sb = StringBuilder()
         sb.append("# Low Distraction — diagnostics\n\n")
-        sb.append("**Version** ").append(r.version).append(" (").append(r.versionCode).append(")  \n")
+        sb.append("**Version** ").append(r.version).append(" (").append(r.versionCode)
+            .append(") · **schema** ").append(r.schemaVersion).append("  \n")
         sb.append("**Generated** ").append(local(r.generatedAt)).append("  \n")
         sb.append("**Diagnostics** ").append(if (r.enabled) "on" else "off")
-        sb.append(" · ").append(r.log.size).append(" log records\n\n")
+            .append(" · ").append(r.events.size).append(" events · ")
+            .append(r.sessions).append(" sessions · ").append(r.crashCount)
+            .append(" crashes\n\n")
 
         for (section in r.sections) {
             sb.append("## ").append(section.title).append("\n\n")
@@ -207,22 +292,25 @@ object DiagnosticsReport {
             sb.append("\n")
         }
 
-        sb.append("## Log\n\n")
-        if (r.log.isEmpty()) {
+        sb.append("## Events\n\n")
+        if (r.events.isEmpty()) {
             sb.append("_Nothing recorded yet._\n\n")
         } else {
             sb.append("```text\n")
-            for (e in r.log) {
+            for (e in r.events) {
                 sb.append(Diag.stamp(e.time)).append("  ").append(e.level.padEnd(5)).append(" ")
-                    .append(e.tag).append(": ").append(e.message).append("\n")
+                    .append(e.name)
+                for ((k, v) in e.props) sb.append("  ").append(k).append('=').append(v)
+                sb.append("\n")
             }
             sb.append("```\n\n")
         }
-        sb.append("_Low Distraction has no internet permission; this report was written ")
-        sb.append("on the device and only leaves it because you chose to export it._\n")
+        sb.append("_Low Distraction has no internet permission; this report was written on ")
+        sb.append("the device and only leaves it because you chose to export it._\n")
         return sb.toString()
     }
 
+    /** The exact structured records — one JSON object per event. */
     fun renderJson(r: Report): String {
         val sb = StringBuilder()
         sb.append("{\n")
@@ -230,6 +318,7 @@ object DiagnosticsReport {
         sb.append("  \"package\": ").append(json(packageOf(r))).append(",\n")
         sb.append("  \"versionName\": ").append(json(r.version)).append(",\n")
         sb.append("  \"versionCode\": ").append(r.versionCode).append(",\n")
+        sb.append("  \"schemaVersion\": ").append(json(r.schemaVersion)).append(",\n")
         sb.append("  \"generatedAt\": ").append(json(isoLocal(r.generatedAt))).append(",\n")
         sb.append("  \"generatedAtMillis\": ").append(r.generatedAt).append(",\n")
         sb.append("  \"diagnosticsEnabled\": ").append(r.enabled).append(",\n")
@@ -246,32 +335,35 @@ object DiagnosticsReport {
             sb.append("      ]\n    }").append(if (si == r.sections.size - 1) "\n" else ",\n")
         }
         sb.append("  ],\n")
-        sb.append("  \"log\": {\n")
-        sb.append("    \"count\": ").append(r.log.size).append(",\n")
-        sb.append("    \"crashes\": ").append(r.crashCount).append(",\n")
-        sb.append("    \"entries\": [\n")
-        for ((i, e) in r.log.withIndex()) {
-            sb.append("      { \"time\": ").append(e.time)
-                .append(", \"timeText\": ").append(json(Diag.stamp(e.time)))
-                .append(", \"level\": ").append(json(e.level))
-                .append(", \"tag\": ").append(json(e.tag))
-                .append(", \"message\": ").append(json(e.message)).append(" }")
-            sb.append(if (i == r.log.size - 1) "\n" else ",\n")
+        sb.append("  \"events\": [\n")
+        for ((i, raw) in r.rawEvents.withIndex()) {
+            sb.append("    ").append(raw).append(if (i == r.rawEvents.size - 1) "\n" else ",\n")
         }
-        sb.append("    ]\n  }\n}\n")
+        sb.append("  ]\n}\n")
         return sb.toString()
     }
 
-    /** The log as a table — opens straight into Excel or Google Sheets. */
+    /** One row per event, with every property as a column. */
     fun renderCsv(r: Report): String {
+        val columns = ArrayList<String>()
+        for (k in listOf("timestamp", "log_level", "event_name", "session_id", "screen_or_route")) {
+            columns.add(k)
+        }
+        val extra = LinkedHashSet<String>()
+        for (e in r.events) for (k in e.props.keys) extra.add(k)
+        columns.addAll(extra.sorted())
+
         val sb = StringBuilder()
-        sb.append("time,epochMillis,level,tag,message\n")
-        for (e in r.log) {
-            sb.append(csv(Diag.stamp(e.time))).append(',')
-                .append(e.time).append(',')
-                .append(csv(e.level)).append(',')
-                .append(csv(e.tag)).append(',')
-                .append(csv(e.message)).append('\n')
+        sb.append(columns.joinToString(",") { csv(it) }).append('\n')
+        for (e in r.events) {
+            val cells = ArrayList<String>()
+            cells.add(Diag.stamp(e.time))
+            cells.add(e.level)
+            cells.add(e.name)
+            cells.add(e.session)
+            cells.add(e.screen)
+            for (k in extra.sorted()) cells.add(e.props[k] ?: "")
+            sb.append(cells.joinToString(",") { csv(it) }).append('\n')
         }
         return sb.toString()
     }
