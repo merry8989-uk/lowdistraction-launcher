@@ -93,6 +93,7 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Diag.install(this)
         setContentView(R.layout.activity_main)
 
         hiddenApps = HiddenApps(this)
@@ -601,6 +602,7 @@ class MainActivity : Activity() {
     }
 
     private fun announceCancel(app: AppInfo) {
+        Diag.info(this, "pause", "Cancelled: " + app.label)
         Toast.makeText(this, getString(R.string.pause_cancelled, app.label), Toast.LENGTH_SHORT)
             .show()
     }
@@ -726,6 +728,7 @@ class MainActivity : Activity() {
     }
 
     private fun launch(app: AppInfo) {
+        Diag.info(this, "launch", "Opened " + app.label)
         AppUsage.record(this, app.component.flattenToString())
         val intent = Intent(Intent.ACTION_MAIN).apply {
             addCategory(Intent.CATEGORY_LAUNCHER)

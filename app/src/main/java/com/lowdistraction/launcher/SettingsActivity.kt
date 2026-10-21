@@ -68,6 +68,10 @@ class SettingsActivity : Activity() {
 
         findViewById<View>(R.id.row_pause_seconds).setOnClickListener { showPauseSecondsDialog() }
 
+        findViewById<View>(R.id.row_diagnostics).setOnClickListener {
+            startActivity(Intent(this, DiagnosticsActivity::class.java))
+        }
+
         findViewById<View>(R.id.row_guide).setOnClickListener {
             startActivity(Intent(this, GuideActivity::class.java))
         }
@@ -151,10 +155,23 @@ class SettingsActivity : Activity() {
 
         updatePauseSecondsRow()
 
+        val diag = findViewById<Switch>(R.id.diag_switch)
+        diag.setOnCheckedChangeListener(null)
+        diag.isChecked = Diag.isEnabled(this)
+        diag.setOnCheckedChangeListener { _, isChecked ->
+            Diag.setEnabled(this, isChecked)
+            Toast.makeText(
+                this,
+                if (isChecked) R.string.diag_now_on else R.string.diag_now_off,
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+
         findViewById<TextView>(R.id.wheelSoundDesc).text = WheelSound.selected(this).name
     }
 
     private fun enableBubble() {
+        Diag.info(this, "bubble", "Bubble switched on")
         if (!Settings.canDrawOverlays(this)) {
             Toast.makeText(this, R.string.bubble_need_overlay, Toast.LENGTH_LONG).show()
             startActivity(
@@ -170,6 +187,7 @@ class SettingsActivity : Activity() {
     }
 
     private fun disableBubble() {
+        Diag.info(this, "bubble", "Bubble switched off")
         FloatingBubbleService.stop(this)
     }
 

@@ -1,0 +1,16 @@
+Diagnostics: see what the app has recorded, and send it on
+
+- New Settings → Diagnostics screen. It shows what the app has logged on your
+  phone, with a live preview of exactly what would be exported.
+- Email the report: opens your mail app with the maintainer's address already
+  filled in, the whole report in the message body, and the report attached as a
+  file. Nothing to type.
+- Export it as a file, in whichever shape suits you: .txt, .md (for a GitHub
+  issue), .json (for a tool), or .csv (opens straight into Excel or Google
+  Sheets). Or Share it to any app.
+- Refresh and Clean do exactly what they say: rebuild the report, or wipe the
+  log.
+- Diagnostics are ON by default and can be switched off in Settings — while
+  they are off, nothing at all is recorded. It is a plain text file inside the
+  app's own storage; the app still has no internet permission, so the log can
+  only leave the phone when you send it yourself.

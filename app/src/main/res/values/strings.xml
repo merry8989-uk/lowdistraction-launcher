@@ -313,4 +313,41 @@
     <string name="tea_mode_remaining">Time left: %1$s</string>
     <string name="tea_mode_done">Break over. Welcome back.</string>
     <string name="tea_mode_hold_to_exit">Hold here for 3 seconds to end early</string>
+
+    <!-- Diagnostics -->
+    <string name="settings_row_diag_log">Record diagnostics</string>
+    <string name="settings_diag_log_desc">On by default. Turn off to stop recording entirely.</string>
+    <string name="settings_row_diagnostics">Diagnostics</string>
+    <string name="settings_diagnostics_desc">See what has been recorded, export it, or mail it to the maintainer</string>
+
+    <string name="diag_title">Diagnostics</string>
+    <string name="diag_sub">What this app has recorded on your phone. Nothing is uploaded — it leaves the phone only when you export or send it.</string>
+    <string name="diag_summary">%1$d log records · %2$s on disk · %3$d crashes</string>
+    <string name="diag_refresh">Refresh</string>
+    <string name="diag_refreshed">Report refreshed</string>
+    <string name="diag_clean">Clean</string>
+    <string name="diag_clean_confirm">Delete every recorded entry? Anything you export afterwards will hold only the device snapshot and whatever happens next.</string>
+    <string name="diag_clean_yes">Delete</string>
+    <string name="diag_export">Export</string>
+    <string name="diag_share">Share</string>
+    <string name="diag_email">Email the report</string>
+    <string name="diag_email_note">Opens your mail app with %1$s already filled in. The whole report goes into the message and is attached as a file, so there is nothing to type.</string>
+    <string name="diag_preview">Preview — this is what gets exported:</string>
+    <string name="diag_preview_cut">%1$d more characters in the exported file</string>
+    <string name="diag_turn_off">Diagnostics are on — tap to turn them off</string>
+    <string name="diag_turn_on">Diagnostics are off — tap to turn them on</string>
+    <string name="diag_now_on">Diagnostics on</string>
+    <string name="diag_now_off">Diagnostics off — nothing more will be recorded</string>
+    <string name="diag_choose_format">Choose a file type</string>
+    <string name="diag_fmt_txt">Text · .txt — read it anywhere</string>
+    <string name="diag_fmt_md">Markdown · .md — for a GitHub issue</string>
+    <string name="diag_fmt_json">JSON · .json — for a tool</string>
+    <string name="diag_fmt_csv">Spreadsheet · .csv — opens in Excel or Sheets</string>
+    <string name="diag_choose_share">Share report</string>
+    <string name="diag_choose_mail">Send report</string>
+    <string name="diag_saved">Saved %1$s</string>
+    <string name="diag_save_failed">Could not write the file</string>
+    <string name="diag_no_picker">No file picker available on this device</string>
+    <string name="diag_no_mail">No mail app found. The report is ready — send it to %1$s from any app.</string>
+    <string name="diag_failed">Could not build the report</string>
 </resources>

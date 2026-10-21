@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Paths the app may hand to another app when the user taps a file in a search
-  result. Read-only sharing; nothing here is ever written.
+  Paths the app may hand to another app. Read-only sharing of files the user
+  picked out of a search result, plus the diagnostics reports the user chose to
+  export or send. Nothing here is ever uploaded.
 -->
 <paths>
     <external-path name="external" path="." />
     <root-path name="root" path="." />
+    <!-- Diagnostics exports, written to the app's own private storage. -->
+    <cache-path name="diag_cache" path="diagnostics/" />
+    <files-path name="diag_files" path="." />
 </paths>
