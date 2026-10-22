@@ -16,7 +16,10 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.FileProvider
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 /**
  * The diagnostics screen.
@@ -40,8 +43,9 @@ class DiagnosticsActivity : Activity() {
     private var report: DiagnosticsReport.Report? = null
 
     /** Set while a "save to file" picker is open. */
-    private var pendingText: String? = null
+    private var pendingBytes: ByteArray? = null
     private var pendingName: String = ""
+    private var pendingFormat: Events.ExportFormat? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -128,7 +132,7 @@ class DiagnosticsActivity : Activity() {
         column.addView(spacerH(dp(10)))
 
         val row3 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        row3.addView(button(getString(R.string.diag_email), theme, accent = true) { emailReport() })
+        row3.addView(button(getString(R.string.diag_email), theme, accent = true) { chooseMailFormat() })
         column.addView(row3)
 
         column.addView(
@@ -257,29 +261,53 @@ class DiagnosticsActivity : Activity() {
         refresh()
     }
 
-    /** Ask which file type, then either save it or hand it to another app. */
+    /** One rendered report: its bytes, its file extension and its MIME type. */
+    private class Blob(val bytes: ByteArray, val ext: String, val mime: String)
+
+    private fun label(ext: String): String = when (ext) {
+        "md" -> getString(R.string.diag_fmt_md)
+        "json" -> getString(R.string.diag_fmt_json)
+        "csv" -> getString(R.string.diag_fmt_csv)
+        "zip" -> getString(R.string.diag_fmt_zip)
+        "all" -> getString(R.string.diag_fmt_everything)
+        else -> getString(R.string.diag_fmt_txt)
+    }
+
+    /** Export and Share: one file, in whichever shape you pick. */
     private fun chooseFormat(share: Boolean) {
         val current = report ?: return
-        val labels = arrayOf(
-            getString(R.string.diag_fmt_txt),
-            getString(R.string.diag_fmt_md),
-            getString(R.string.diag_fmt_json),
-            getString(R.string.diag_fmt_csv)
-        )
         AlertDialog.Builder(this)
             .setTitle(R.string.diag_choose_format)
-            .setItems(labels) { _, which ->
-                val ext = FORMATS[which]
-                val text = render(current, ext)
+            .setItems(EXPORT_FORMATS.map { label(it) }.toTypedArray()) { _, which ->
+                val ext = EXPORT_FORMATS[which]
+                val blob = renderOne(current, ext)
                 Events.diagnosticsAction(
                     this,
                     if (share) Events.DiagAction.SHARE else Events.DiagAction.EXPORT,
-                    formatOf(ext), null, text.length.toLong(), current.events.size
+                    formatOf(ext), null, blob.bytes.size.toLong(), current.events.size
                 )
-                if (share) shareText(text, ext) else saveText(text, ext)
+                if (share) shareBlob(blob, current) else saveBlob(blob, current)
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
+    }
+
+    /** Renders one report. A `.zip` holds all four shapes in a single archive. */
+    private fun renderOne(r: DiagnosticsReport.Report, ext: String): Blob = when (ext) {
+        "zip" -> Blob(renderZip(r), "zip", "application/zip")
+        else -> Blob(render(r, ext).toByteArray(Charsets.UTF_8), ext, mime(ext))
+    }
+
+    private fun renderZip(r: DiagnosticsReport.Report): ByteArray {
+        val out = ByteArrayOutputStream()
+        ZipOutputStream(out).use { zip ->
+            for (ext in TEXT_FORMATS) {
+                zip.putNextEntry(ZipEntry("lowdistraction-diagnostics.$ext"))
+                zip.write(render(r, ext).toByteArray(Charsets.UTF_8))
+                zip.closeEntry()
+            }
+        }
+        return out.toByteArray()
     }
 
     private fun render(r: DiagnosticsReport.Report, ext: String): String = when (ext) {
@@ -293,6 +321,8 @@ class DiagnosticsActivity : Activity() {
         "md" -> Events.ExportFormat.MD
         "json" -> Events.ExportFormat.JSON
         "csv" -> Events.ExportFormat.CSV
+        "zip" -> Events.ExportFormat.ZIP
+        "all" -> Events.ExportFormat.ALL
         else -> Events.ExportFormat.TXT
     }
 
@@ -300,22 +330,24 @@ class DiagnosticsActivity : Activity() {
         "md" -> "text/markdown"
         "json" -> "application/json"
         "csv" -> "text/csv"
+        "zip" -> "application/zip"
         else -> "text/plain"
     }
 
     // ------------------------------------------------------------------ save
-    private fun saveText(text: String, ext: String) {
-        pendingText = text
-        pendingName = DiagnosticsReport.fileName(ext)
+    private fun saveBlob(blob: Blob, r: DiagnosticsReport.Report) {
+        pendingBytes = blob.bytes
+        pendingName = DiagnosticsReport.fileName(blob.ext)
+        pendingFormat = formatOf(blob.ext)
         val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
-            type = mime(ext)
+            type = blob.mime
             putExtra(Intent.EXTRA_TITLE, pendingName)
         }
         try {
             startActivityForResult(intent, REQUEST_SAVE)
         } catch (_: ActivityNotFoundException) {
-            pendingText = null
+            pendingBytes = null
             Toast.makeText(this, R.string.diag_no_picker, Toast.LENGTH_LONG).show()
         }
     }
@@ -323,30 +355,32 @@ class DiagnosticsActivity : Activity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode != REQUEST_SAVE) return
-        val text = pendingText ?: return
+        val bytes = pendingBytes ?: return
         val uri = data?.data
-        pendingText = null
+        val name = pendingName
+        val format = pendingFormat
+        pendingBytes = null
         if (resultCode != RESULT_OK || uri == null) return
         val ok = runCatching {
             contentResolver.openOutputStream(uri)?.use { out ->
-                out.write(text.toByteArray(Charsets.UTF_8))
+                out.write(bytes)
                 out.flush()
             }
         }.isSuccess
         Events.diagnosticsAction(
-            this, Events.DiagAction.EXPORT, null, Events.ExportChannel.SAVE,
-            text.length.toLong(), report?.events?.size ?: 0
+            this, Events.DiagAction.EXPORT, format, Events.ExportChannel.SAVE,
+            bytes.size.toLong(), report?.events?.size ?: 0
         )
         Toast.makeText(
             this,
-            if (ok) getString(R.string.diag_saved, pendingName) else getString(R.string.diag_save_failed),
+            if (ok) getString(R.string.diag_saved, name) else getString(R.string.diag_save_failed),
             Toast.LENGTH_LONG
         ).show()
     }
 
     // ----------------------------------------------------------------- share
-    private fun shareText(text: String, ext: String) {
-        val file = writeTemp(text, ext) ?: run {
+    private fun shareBlob(blob: Blob, r: DiagnosticsReport.Report) {
+        val file = writeTemp(blob.bytes, blob.ext) ?: run {
             Toast.makeText(this, R.string.diag_save_failed, Toast.LENGTH_LONG).show()
             return
         }
@@ -356,15 +390,14 @@ class DiagnosticsActivity : Activity() {
             Toast.makeText(this, R.string.diag_save_failed, Toast.LENGTH_LONG).show()
             return
         }
-        Events.diagnosticsAction(
-            this, Events.DiagAction.SHARE, formatOf(ext),
-            Events.ExportChannel.SHARE, text.length.toLong(), report?.events?.size ?: 0
-        )
         val intent = Intent(Intent.ACTION_SEND).apply {
-            type = mime(ext)
+            type = blob.mime
             putExtra(Intent.EXTRA_STREAM, uri)
             putExtra(Intent.EXTRA_SUBJECT, mailSubject())
-            putExtra(Intent.EXTRA_TEXT, mailBody(text, listOf(file.name)))
+            putExtra(
+                Intent.EXTRA_TEXT,
+                mailBody(DiagnosticsReport.renderText(r), listOf(file.name))
+            )
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         startChooser(intent, R.string.diag_choose_share)
@@ -372,33 +405,50 @@ class DiagnosticsActivity : Activity() {
 
     // ----------------------------------------------------------------- email
     /**
-     * One tap and Gmail is open with everything already in place: the
-     * maintainer's address, a subject naming the version, the whole report in
-     * the message body, and the report attached as both a readable `.txt` and
-     * the structured `.json`. Nothing to type, nothing to attach by hand.
+     * Pick what the mail should carry, then Gmail opens with everything already
+     * in place: the maintainer's address, a subject naming the version, the whole
+     * report in the message body, and the report attached. Nothing to type, and
+     * nothing to attach by hand.
      *
      * Gmail is targeted directly so no chooser stands in the way. If it is not
      * installed the same mail is offered to whatever else can take it, and if
      * nothing can, the address is shown so it can be copied.
      */
-    private fun emailReport() {
+    private fun chooseMailFormat() {
         val current = report ?: return
-        val text = DiagnosticsReport.renderText(current)
-        val json = DiagnosticsReport.renderJson(current)
-        Events.diagnosticsAction(
-            this, Events.DiagAction.EMAIL, Events.ExportFormat.TXT,
-            Events.ExportChannel.EMAIL, text.length.toLong(), current.events.size
-        )
+        val options = listOf("all") + EXPORT_FORMATS.toList()
+        AlertDialog.Builder(this)
+            .setTitle(R.string.diag_choose_mail_format)
+            .setItems(options.map { label(it) }.toTypedArray()) { _, which ->
+                emailReport(current, options[which])
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
 
-        // Attach the readable report and the structured export together.
+    private fun emailReport(current: DiagnosticsReport.Report, what: String) {
+        val text = DiagnosticsReport.renderText(current)
         val files = ArrayList<File>()
-        writeTemp(text, "txt")?.let { files.add(it) }
-        writeTemp(json, "json")?.let { files.add(it) }
+        if (what == "all") {
+            // The default: a readable report and the structured export together.
+            writeTemp(text.toByteArray(Charsets.UTF_8), "txt")?.let { files.add(it) }
+            writeTemp(
+                DiagnosticsReport.renderJson(current).toByteArray(Charsets.UTF_8), "json"
+            )?.let { files.add(it) }
+        } else {
+            val blob = renderOne(current, what)
+            writeTemp(blob.bytes, blob.ext)?.let { files.add(it) }
+        }
         val uris = files.mapNotNull { file ->
             runCatching {
                 FileProvider.getUriForFile(this, packageName + ".files", file)
             }.getOrNull()
         }
+
+        Events.diagnosticsAction(
+            this, Events.DiagAction.EMAIL, formatOf(what),
+            Events.ExportChannel.EMAIL, text.length.toLong(), current.events.size
+        )
 
         val subject = mailSubject()
         val body = mailBody(text, files.map { it.name })
@@ -484,7 +534,7 @@ class DiagnosticsActivity : Activity() {
         }
     }
 
-    private fun writeTemp(text: String, ext: String): File? = runCatching {
+    private fun writeTemp(bytes: ByteArray, ext: String): File? = runCatching {
         val dir = File(cacheDir, "diagnostics").apply { mkdirs() }
         // Housekeeping only: anything a previous export left behind for a day is
         // removed. Fresh files are kept, so a share target that reads the file
@@ -492,7 +542,7 @@ class DiagnosticsActivity : Activity() {
         val cutoff = System.currentTimeMillis() - 24L * 60 * 60 * 1000
         dir.listFiles()?.forEach { if (it.isFile && it.lastModified() < cutoff) it.delete() }
         val file = File(dir, DiagnosticsReport.fileName(ext))
-        file.writeText(text, Charsets.UTF_8)
+        file.writeBytes(bytes)
         file
     }.getOrNull()
 
@@ -505,7 +555,12 @@ class DiagnosticsActivity : Activity() {
     private companion object {
         const val REQUEST_SAVE = 4401
         const val PREVIEW_LIMIT = 12000
-        val FORMATS = arrayOf("txt", "md", "json", "csv")
+
+        /** The four text shapes; a .zip bundles exactly these. */
+        val TEXT_FORMATS = arrayOf("txt", "md", "json", "csv")
+
+        /** What Export and Share offer. */
+        val EXPORT_FORMATS = arrayOf("txt", "md", "json", "csv", "zip")
 
         /** Targeted so the mail opens straight in Gmail, with no chooser. */
         const val GMAIL = "com.google.android.gm"

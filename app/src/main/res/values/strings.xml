@@ -339,10 +339,13 @@
     <string name="diag_now_on">Diagnostics on</string>
     <string name="diag_now_off">Diagnostics off — nothing more will be recorded</string>
     <string name="diag_choose_format">Choose a file type</string>
+    <string name="diag_choose_mail_format">What should the mail carry?</string>
     <string name="diag_fmt_txt">Text · .txt — read it anywhere</string>
     <string name="diag_fmt_md">Markdown · .md — for a GitHub issue</string>
     <string name="diag_fmt_json">JSON · .json — for a tool</string>
     <string name="diag_fmt_csv">Spreadsheet · .csv — opens in Excel or Sheets</string>
+    <string name="diag_fmt_zip">Archive · .zip — all four reports in one file</string>
+    <string name="diag_fmt_everything">Everything · .txt + .json attached (recommended)</string>
     <string name="diag_choose_share">Share report</string>
     <string name="diag_choose_mail">Send report</string>
     <string name="diag_saved">Saved %1$s</string>

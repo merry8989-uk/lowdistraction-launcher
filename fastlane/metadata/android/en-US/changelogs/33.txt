@@ -1,0 +1,12 @@
+Diagnostics: pick the format, then mail it, save it, or share it
+
+- Export and Share now offer five shapes instead of four: .txt, .md, .json,
+  .csv, and a new .zip that bundles all four reports into one file.
+- Email in Gmail now asks what the mail should carry, so the attachment is your
+  choice: everything (.txt + .json, the default), or any single format including
+  the .zip. Whatever you pick is attached automatically, with the address,
+  subject and the whole report already filled in — nothing to type.
+- Direct share is still there: pick a format and hand the file to any app.
+- Logs keep saving on the device as before, into the app's own private storage.
+  Nothing is uploaded anywhere; a report leaves the phone only when you export,
+  share or mail it.

@@ -52,7 +52,16 @@ object Events {
         DEVCHECK("devcheck")
     }
 
-    enum class ExportFormat(val value: String) { TXT("txt"), MD("md"), JSON("json"), CSV("csv") }
+    enum class ExportFormat(val value: String) {
+        TXT("txt"),
+        MD("md"),
+        JSON("json"),
+        CSV("csv"),
+        /** All four shapes in one archive. */
+        ZIP("zip"),
+        /** Everything at once, attached separately — what the mail does by default. */
+        ALL("all")
+    }
 
     enum class ExportChannel(val value: String) { SAVE("save"), SHARE("share"), EMAIL("email") }
 

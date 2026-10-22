@@ -71,7 +71,9 @@
       "txt",
       "md",
       "json",
-      "csv"
+      "csv",
+      "zip",
+      "all"
     ],
     "export_channel": [
       "save",
