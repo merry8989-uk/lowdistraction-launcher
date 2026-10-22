@@ -353,4 +353,5 @@
     <string name="diag_no_picker">No file picker available on this device</string>
     <string name="diag_no_mail">No mail app found. The report is ready — send it to %1$s from any app.</string>
     <string name="diag_failed">Could not build the report</string>
+    <string name="diag_building">Building the report…</string>
 </resources>

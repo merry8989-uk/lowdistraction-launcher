@@ -79,7 +79,13 @@ object DiagnosticsReport {
         add(Row("Build", if (isDebuggable(c)) "debug" else "release"))
         add(Row("Diagnostics", if (Diag.isEnabled(c)) "on" else "off"))
         add(Row("Log schema", Diag.SCHEMA_VERSION))
-        add(Row("Log size", humanSize(Diag.sizeBytes(c)) + ", " + Diag.entries(c).size + " events"))
+        // lineCount just counts rows; parsing every record here would be wasted work.
+        add(
+            Row(
+                "Log size",
+                humanSize(Diag.sizeBytes(c)) + ", " + Diag.lineCount(c) + " records"
+            )
+        )
         add(Row("Session", Diag.sessionId()))
         add(Row("Generated", local(System.currentTimeMillis())))
         add(Row("Timezone", TimeZone.getDefault().id))

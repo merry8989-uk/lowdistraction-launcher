@@ -1,0 +1,17 @@
+Diagnostics no longer makes the app wait
+
+- Logging used to write to disk on whichever thread raised the event — usually
+  the screen you were looking at. Every event now goes to one background writer
+  thread instead, so nothing on screen ever waits for the disk. The record is
+  still stamped at the moment it happened; only the writing is handed over.
+- Opening Diagnostics used to read and parse the whole log, and gather every
+  device tab, on the main thread — the screen could hang for a moment. It is
+  built on a worker thread now, with a "Building the report…" line, and a stale
+  result can no longer overwrite a newer one.
+- Clearing the log counted the records by parsing every one of them. It now just
+  counts rows, and the wipe happens on the writer thread so it lands before the
+  event that reports it.
+- Pruning old records at startup — which reads and may rewrite the whole file —
+  has moved off the startup path too.
+- If the disk ever falls behind, new lines are dropped rather than letting the
+  backlog grow without end.

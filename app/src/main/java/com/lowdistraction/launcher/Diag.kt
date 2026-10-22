@@ -17,6 +17,8 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 import java.util.UUID
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -61,6 +63,9 @@ object Diag {
     private const val TICK_MS = 1000L
     private const val STALL_MS = 2000L
 
+    /** Lines allowed to be waiting for the disk before new ones are dropped. */
+    private const val MAX_QUEUE = 500
+
     /** High-volume events only. Anything an error, or part of an intent→outcome
      *  pair, is never sampled. */
     private val SAMPLED =
@@ -85,6 +90,19 @@ object Diag {
     private val lock = Any()
     private val sampleCounter = AtomicInteger(0)
     private val fixAttempts = HashMap<String, Int>()
+
+    /**
+     * One background thread writes every line, so no screen ever waits on the
+     * disk. The line itself is built on the calling thread — that keeps the
+     * timestamp and the current screen true to the moment the event happened —
+     * and only the writing is handed over.
+     */
+    private val writer: ExecutorService = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "diag-writer").apply { isDaemon = true }
+    }
+
+    /** Lines waiting for the writer; a backstop, not a queue limit. */
+    private val queued = AtomicInteger(0)
 
     private var appContext: Context? = null
     private var sessionId: String? = null
@@ -154,7 +172,12 @@ object Diag {
                 false
             }
         }
-        if (first) prune(c)
+        // Pruning reads (and may rewrite) the whole file, so it belongs on the
+        // writer thread — the session_start line is queued behind it, in order.
+        if (first) {
+            val ctx = c.applicationContext
+            runCatching { writer.execute { prune(ctx) } }
+        }
         if (first) {
             Events.sessionStart(c, Events.StartType.COLD, coldMs, 0L)
         } else {
@@ -211,40 +234,68 @@ object Diag {
         if (name in SAMPLED && level == "info" && sampleCounter.incrementAndGet() % SAMPLE_1_IN != 0) {
             return
         }
-        runCatching {
-            val now = System.currentTimeMillis()
-            val o = JSONObject()
-            o.put("event_name", name)
-            o.put("schema_version", SCHEMA_VERSION)
-            o.put("timestamp", isoUtc(now))
-            o.put("session_id", sessionId())
-            o.put("platform", PLATFORM)
-            o.put("app_version", appVersion(c))
-            o.put("os", osName())
-            o.put("device_model", deviceModel())
-            o.put("network_type", networkType(c))
-            o.put("screen_or_route", currentScreen)
-            o.put("log_level", level)
-            o.put("release_channel", RELEASE_CHANNEL)
+        val line = runCatching { line(c, name, level, props) }.getOrNull() ?: return
+        enqueue(c, line)
+    }
 
-            for ((k, v) in props) {
-                if (v == null) continue
-                when (v) {
-                    is Int -> o.put(k, v)
-                    is Long -> o.put(k, v)
-                    is Boolean -> o.put(k, v)
-                    is Double -> o.put(k, v)
-                    is Float -> o.put(k, v.toDouble())
-                    else -> o.put(k, redact(v.toString()))
+    /** Builds the envelope and the event's own properties into one JSON line. */
+    private fun line(
+        c: Context,
+        name: String,
+        level: String,
+        props: List<Pair<String, Any?>>
+    ): String {
+        val o = JSONObject()
+        o.put("event_name", name)
+        o.put("schema_version", SCHEMA_VERSION)
+        o.put("timestamp", isoUtc(System.currentTimeMillis()))
+        o.put("session_id", sessionId())
+        o.put("platform", PLATFORM)
+        o.put("app_version", appVersion(c))
+        o.put("os", osName())
+        o.put("device_model", deviceModel())
+        o.put("network_type", networkType(c))
+        o.put("screen_or_route", currentScreen)
+        o.put("log_level", level)
+        o.put("release_channel", RELEASE_CHANNEL)
+
+        for ((k, v) in props) {
+            if (v == null) continue
+            when (v) {
+                is Int -> o.put(k, v)
+                is Long -> o.put(k, v)
+                is Boolean -> o.put(k, v)
+                is Double -> o.put(k, v)
+                is Float -> o.put(k, v.toDouble())
+                else -> o.put(k, redact(v.toString()))
+            }
+        }
+        return o.toString()
+    }
+
+    /** Hands a line to the writer thread. Never blocks the caller on the disk. */
+    private fun enqueue(c: Context, line: String) {
+        // If the disk has fallen behind, drop rather than grow without end.
+        if (queued.get() >= MAX_QUEUE) return
+        val ctx = c.applicationContext
+        queued.incrementAndGet()
+        runCatching {
+            writer.execute {
+                try {
+                    append(ctx, line)
+                } finally {
+                    queued.decrementAndGet()
                 }
             }
+        }.onFailure { queued.decrementAndGet() }
+    }
 
-            val line = o.toString()
+    /** Runs on the writer thread only. */
+    private fun append(c: Context, line: String) {
+        runCatching {
             val f = file(c)
-            synchronized(lock) {
-                if (f.length() > MAX_BYTES) f.delete()
-                f.appendText(line + "\n")
-            }
+            if (f.length() > MAX_BYTES) f.delete()
+            f.appendText(line + "\n")
         }
     }
 
@@ -256,7 +307,13 @@ object Diag {
         runCatching { JSONObject(raw) }.getOrNull()?.let { raw }
     }
 
-    /** The same records, parsed for display and for the spreadsheet export. */
+    /**
+     * The same records, parsed for display and for the spreadsheet export.
+     *
+     * Reads and parses the file, so call it off the main thread —
+     * [DiagnosticsReport.collect] does exactly that. Writing is never done on the
+     * caller's thread; reading still is.
+     */
     fun entries(c: Context): List<Event> {
         val out = ArrayList<Event>()
         for (raw in rawEvents(c)) {
@@ -285,10 +342,34 @@ object Diag {
     }
 
     fun clear(c: Context) {
-        val before = entries(c).size
-        runCatching { file(c).writeText("") }
-        Events.diagnosticsAction(c, Events.DiagAction.CLEAN, null, null, null, before)
+        val ctx = c.applicationContext
+        // Counting, wiping and recording all happen on the writer thread, so the
+        // screen never waits — and the wipe lands before the event that reports it.
+        runCatching {
+            writer.execute {
+                val before = lineCount(ctx)
+                runCatching { file(ctx).writeText("") }
+                Events.diagnosticsAction(ctx, Events.DiagAction.CLEAN, null, null, null, before)
+            }
+        }
     }
+
+    /**
+     * How many records the file holds, without parsing a single one. Reads the
+     * file, so prefer the writer thread or a worker.
+     */
+    fun lineCount(c: Context): Int = runCatching {
+        val f = file(c)
+        if (!f.exists() || f.length() == 0L) return@runCatching 0
+        var n = 0
+        f.bufferedReader().use { reader ->
+            while (true) {
+                val row = reader.readLine() ?: break
+                if (row.isNotBlank()) n++
+            }
+        }
+        n
+    }.getOrDefault(0)
 
     private fun tail(c: Context): List<String> = runCatching {
         val f = file(c)

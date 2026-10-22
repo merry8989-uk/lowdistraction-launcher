@@ -42,6 +42,9 @@ class DiagnosticsActivity : Activity() {
 
     private var report: DiagnosticsReport.Report? = null
 
+    /** Guards against a slow refresh overwriting a newer one. */
+    private var refreshToken = 0
+
     /** Set while a "save to file" picker is open. */
     private var pendingBytes: ByteArray? = null
     private var pendingName: String = ""
@@ -210,8 +213,30 @@ class DiagnosticsActivity : Activity() {
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     // ---------------------------------------------------------------- actions
+    /**
+     * Collecting the report reads the whole log and every device tab, so it runs
+     * on a worker thread — the screen shows a "building" line and never freezes.
+     * The token drops a stale result if Refresh is tapped twice.
+     */
     private fun refresh() {
-        val fresh = runCatching { DiagnosticsReport.collect(this) }.getOrNull()
+        val token = ++refreshToken
+        summary.text = getString(R.string.diag_building)
+        Thread {
+            val fresh = runCatching { DiagnosticsReport.collect(this) }.getOrNull()
+            runOnUiThread { if (token == refreshToken) showReport(fresh) }
+        }.start()
+    }
+
+    /** The last built report, or a nudge if it is still being put together. */
+    private fun currentReport(): DiagnosticsReport.Report? {
+        val built = report
+        if (built == null) {
+            Toast.makeText(this, R.string.diag_building, Toast.LENGTH_SHORT).show()
+        }
+        return built
+    }
+
+    private fun showReport(fresh: DiagnosticsReport.Report?) {
         report = fresh
         if (fresh == null) {
             summary.text = getString(R.string.diag_failed)
@@ -275,7 +300,7 @@ class DiagnosticsActivity : Activity() {
 
     /** Export and Share: one file, in whichever shape you pick. */
     private fun chooseFormat(share: Boolean) {
-        val current = report ?: return
+        val current = currentReport() ?: return
         AlertDialog.Builder(this)
             .setTitle(R.string.diag_choose_format)
             .setItems(EXPORT_FORMATS.map { label(it) }.toTypedArray()) { _, which ->
@@ -415,7 +440,7 @@ class DiagnosticsActivity : Activity() {
      * nothing can, the address is shown so it can be copied.
      */
     private fun chooseMailFormat() {
-        val current = report ?: return
+        val current = currentReport() ?: return
         val options = listOf("all") + EXPORT_FORMATS.toList()
         AlertDialog.Builder(this)
             .setTitle(R.string.diag_choose_mail_format)
