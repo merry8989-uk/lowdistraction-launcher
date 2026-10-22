@@ -381,13 +381,13 @@ class DiagnosticsActivity : Activity() {
     // ----------------------------------------------------------------- share
     private fun shareBlob(blob: Blob, r: DiagnosticsReport.Report) {
         val file = writeTemp(blob.bytes, blob.ext) ?: run {
-            Toast.makeText(this, R.string.diag_save_failed, Toast.LENGTH_LONG).show()
+            failToWrite()
             return
         }
         val uri = runCatching {
             FileProvider.getUriForFile(this, packageName + ".files", file)
         }.getOrNull() ?: run {
-            Toast.makeText(this, R.string.diag_save_failed, Toast.LENGTH_LONG).show()
+            failToWrite()
             return
         }
         val intent = Intent(Intent.ACTION_SEND).apply {
@@ -545,6 +545,12 @@ class DiagnosticsActivity : Activity() {
         file.writeBytes(bytes)
         file
     }.getOrNull()
+
+    /** The one place a write failure is reported, so it is never silent. */
+    private fun failToWrite() {
+        Events.errorStateShown(this, "diagnostics_write_failed", "Diagnostics", "diag_save_failed")
+        Toast.makeText(this, R.string.diag_save_failed, Toast.LENGTH_LONG).show()
+    }
 
     private fun humanSize(bytes: Long): String = when {
         bytes >= 1024L * 1024L -> String.format(java.util.Locale.US, "%.1f MB", bytes / 1024f / 1024f)

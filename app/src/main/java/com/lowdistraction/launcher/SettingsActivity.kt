@@ -255,6 +255,7 @@ class SettingsActivity : Activity() {
     private fun openApp(pkg: String, label: String) {
         val intent = packageManager.getLaunchIntentForPackage(pkg)
         if (intent == null) {
+            reportOpenFailure()
             Toast.makeText(this, getString(R.string.hidden_open_failed, label), Toast.LENGTH_LONG)
                 .show()
             return
@@ -263,9 +264,15 @@ class SettingsActivity : Activity() {
         try {
             startActivity(intent)
         } catch (_: Exception) {
+            reportOpenFailure()
             Toast.makeText(this, getString(R.string.hidden_open_failed, label), Toast.LENGTH_LONG)
                 .show()
         }
+    }
+
+    /** A hidden app that would not open is a friction point worth recording. */
+    private fun reportOpenFailure() {
+        Events.errorStateShown(this, "hidden_open_failed", "Settings", "hidden_open_failed")
     }
 
     private fun labelOf(pkg: String): String = try {

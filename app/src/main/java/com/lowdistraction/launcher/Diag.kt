@@ -63,7 +63,8 @@ object Diag {
 
     /** High-volume events only. Anything an error, or part of an intent→outcome
      *  pair, is never sampled. */
-    private val SAMPLED = setOf("scroll_depth", "screen_view", "performance_marker")
+    private val SAMPLED =
+        setOf("scroll_depth", "screen_view", "performance_marker", "media_query_result")
 
     /** Keys that belong to the envelope rather than to an individual event. */
     val ENVELOPE = setOf(

@@ -101,6 +101,9 @@ class MainActivity : Activity() {
     private var rageTarget = -1
     private var rageCount = 0
     private var rageWindowStart = 0L
+
+    /** Deepest quarter of the list reached since the screen was last shown. */
+    private var scrollBand = -1
     private val searchLogHandler = Handler(Looper.getMainLooper())
     private var searchLogRunnable: Runnable? = null
 
@@ -132,6 +135,7 @@ class MainActivity : Activity() {
         list.layoutManager = LinearLayoutManager(this)
         list.adapter = appAdapter
         setupGestures(list)
+        setupScrollDepth(list)
 
         // Long-press anywhere on the home screen opens Settings.
         findViewById<View>(R.id.header).setOnLongClickListener { openSettings(); true }
@@ -377,6 +381,7 @@ class MainActivity : Activity() {
         // Leaving the launcher without opening anything is a drop-off; leaving
         // because an app was just opened is not.
         if (System.currentTimeMillis() - lastLaunchAt > 2000L) Diag.endSession(this)
+        scrollBand = -1
     }
 
     override fun onDestroy() {
@@ -466,6 +471,7 @@ class MainActivity : Activity() {
     }
 
     private fun filter(query: String) {
+        val startedAt = System.currentTimeMillis()
         autoOpenHandler.removeCallbacksAndMessages(null)
         list.adapter = appAdapter
         emptyView.text = getString(R.string.no_apps)
@@ -492,6 +498,31 @@ class MainActivity : Activity() {
         }
 
         logSearchQuery(q, filtered.size)
+
+        // Only worth a marker when a rebuild is slow enough to be felt: one
+        // frame is about 16 ms. A fast filter stays silent, so the marker means
+        // something when it appears.
+        val took = System.currentTimeMillis() - startedAt
+        if (took > SLOW_RENDER_MS) Events.performanceMarker(this, "home_list_render", took)
+    }
+
+    /**
+     * Records how far down the list the user got, once per quarter, so the
+     * report can say whether the list is too long to scan.
+     */
+    private fun setupScrollDepth(list: RecyclerView) {
+        list.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(rv: RecyclerView, dx: Int, dy: Int) {
+                val range = rv.computeVerticalScrollRange()
+                if (range <= 0 || rv.height <= 0) return
+                val seen = ((rv.computeVerticalScrollOffset() + rv.height) * 100 / range)
+                val band = seen.coerceIn(0, 100) / 25
+                if (band > scrollBand) {
+                    scrollBand = band
+                    Events.scrollDepth(this@MainActivity, seen.coerceIn(0, 100), SCREEN_HOME)
+                }
+            }
+        })
     }
 
     /**
@@ -1155,6 +1186,7 @@ class MainActivity : Activity() {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK
         }
         if (packageManager.resolveActivity(intent, 0) == null) {
+            Events.errorStateShown(this, "uninstall_unavailable", SCREEN_HOME, "uninstall_unavailable")
             Toast.makeText(this, R.string.uninstall_unavailable, Toast.LENGTH_SHORT).show()
             return
         }
@@ -1191,6 +1223,7 @@ class MainActivity : Activity() {
     companion object {
         const val EXTRA_PICK_APPS = "pick_apps"
         private const val SCREEN_HOME = "Home"
+        private const val SLOW_RENDER_MS = 16L
         private const val PREFS = "launcher_prefs"
         private const val KEY_PROMPT_SHOWN = "default_prompt_shown"
         private const val SWIPE_MIN = 100f

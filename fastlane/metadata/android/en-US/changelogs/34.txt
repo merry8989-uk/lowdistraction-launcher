@@ -1,0 +1,15 @@
+Diagnostics: the four events that never fired now do
+
+- Scroll depth, slow-render markers, file-search results and error states were
+  declared in the logging schema but never actually recorded — the schema
+  promised data that never arrived. All four are now wired up, so the report's
+  Signals and Log health sections mean what they say.
+- The schema check in CI now also fails when an event is declared but never
+  called, which is how those four slipped through. A log that never fires is
+  worse than none.
+- Slow list rebuilds (over one frame) are now recorded as a performance marker,
+  so a stutter shows up in the report instead of only being felt.
+- Deepest scroll and the file-search cost are recorded, so a list that is too
+  long to scan, or a file index that has grown slow, becomes visible.
+- Tea mode no longer ends in silence: when the five minutes are up it says
+  "Break over. Welcome back." before closing.

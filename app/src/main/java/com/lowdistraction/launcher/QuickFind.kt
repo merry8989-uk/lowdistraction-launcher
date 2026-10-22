@@ -83,24 +83,35 @@ object QuickFind {
      * Files and folders inside the folders the user has shared with the app,
      * matched by name. Documents, media and sub-folders all turn up here.
      */
-    private fun fileEntries(context: Context, query: String): List<QuickEntry> =
-        FileIndex.search(context, query, 10).map { f ->
-            if (f.isDirectory) {
-                QuickEntry(f.name, "Folder - ${f.where()}", folder = f)
-            } else {
-                val size = f.sizeText()
-                val hint = buildString {
-                    append(f.kind())
-                    append(" - ")
-                    append(f.where())
-                    if (size.isNotEmpty()) {
-                        append(" - ")
-                        append(size)
-                    }
-                }
-                QuickEntry(f.name, hint, FileIndex.openIntent(context, f))
+    private fun fileEntries(context: Context, query: String): List<QuickEntry> {
+        val startedAt = System.currentTimeMillis()
+        return FileIndex.search(context, query, 10)
+            .also { found ->
+                // Only the count and how long it took — never the query or the
+                // names of the user's files.
+                Events.mediaQueryResult(
+                    context, Events.SearchSource.FILES, found.size,
+                    System.currentTimeMillis() - startedAt, null
+                )
             }
-        }
+            .map { f ->
+                if (f.isDirectory) {
+                    QuickEntry(f.name, "Folder - ${f.where()}", folder = f)
+                } else {
+                    val size = f.sizeText()
+                    val hint = buildString {
+                        append(f.kind())
+                        append(" - ")
+                        append(f.where())
+                        if (size.isNotEmpty()) {
+                            append(" - ")
+                            append(size)
+                        }
+                    }
+                    QuickEntry(f.name, hint, FileIndex.openIntent(context, f))
+                }
+            }
+    }
 
     private fun settingsEntries(query: String): List<QuickEntry> {
         val q = query.lowercase()

@@ -7,6 +7,7 @@ import android.view.Gravity
 import android.view.WindowManager
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import com.lowdistraction.launcher.Events
 import com.lowdistraction.launcher.R
 
@@ -77,6 +78,10 @@ class TeaModeActivity : Activity() {
             }
 
             override fun onFinish() {
+                // Say so before leaving — the break used to end in silence.
+                Toast.makeText(
+                    this@TeaModeActivity, R.string.tea_mode_done, Toast.LENGTH_LONG
+                ).show()
                 finish()
             }
         }.start()

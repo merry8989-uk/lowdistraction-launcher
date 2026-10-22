@@ -113,6 +113,7 @@ def validate():
             problems.append(f"{name}: declared in the schema but never logged")
 
     # Nothing outside Events.kt may call the logger directly.
+    outside = {}
     for dirpath, _dirs, files in os.walk(JAVA_ROOT):
         for f in files:
             if not f.endswith(".kt"):
@@ -121,11 +122,30 @@ def validate():
             if os.path.abspath(path) == os.path.abspath(EVENTS_KT):
                 continue
             body = open(path, encoding="utf-8").read()
+            outside[os.path.relpath(path, ROOT)] = body
             if "Diag.event(" in body or "Diag.write(" in body:
                 problems.append(
                     f"{os.path.relpath(path, ROOT)}: calls Diag.event/write directly — "
                     "route it through Events.kt"
                 )
+    outside_all = "\n".join(outside.values())
+
+    # A declared event the app never calls is worse than none: the schema would
+    # promise data that never arrives. Check the call sites, not just the
+    # declaration — that is how four dead events slipped through before.
+    # An event another event calls internally (permission_loop) counts as wired.
+    declared_fns = set(
+        re.findall(r"^\s{4}fun ([A-Za-z][A-Za-z0-9]*)\([^)]*\)\s*[:=]", text, re.M)
+    )
+    declared_fns.discard("log")
+    # Strip the declarations first: otherwise every function name matches its own
+    # "fun name(" line and the check below can never fail.
+    body_only = re.sub(r"\bfun\s+[A-Za-z][A-Za-z0-9]*\s*\(", "FUN(", text)
+    internal_calls = set(re.findall(r"(?<![\w.])([A-Za-z][A-Za-z0-9]*)\s*\(", body_only))
+    for fn in sorted(declared_fns):
+        if f"Events.{fn}(" in outside_all or fn in internal_calls:
+            continue
+        problems.append(f"{fn}(): declared in Events.kt but never called from the app")
 
     # The Kotlin enums must not drift from the schema enums.
     for kt_name, schema_name in KOTLIN_ENUMS.items():
