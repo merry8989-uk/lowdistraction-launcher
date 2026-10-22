@@ -937,7 +937,20 @@ class MainActivity : Activity() {
                 if (!FileIndex.isEnabled(this)) return@runCatching
                 val stale = FileIndex.count(this) == 0 ||
                     System.currentTimeMillis() - FileIndex.indexedAt(this) > INDEX_MAX_AGE_MS
-                if (stale) FileIndex.rebuild(this)
+                if (stale) {
+                    // Walking storage is the one real background job this app has,
+                    // so it is logged as one — with how long it took and what it found.
+                    val startedAt = System.currentTimeMillis()
+                    val ok = runCatching { FileIndex.rebuild(this) }.isSuccess
+                    val count = runCatching { FileIndex.count(this) }.getOrDefault(0)
+                    Events.fileIndexRebuild(
+                        this,
+                        if (ok) Events.Outcome.SUCCESS else Events.Outcome.FAILED,
+                        count,
+                        System.currentTimeMillis() - startedAt,
+                        "stale"
+                    )
+                }
             }
         }.start()
     }

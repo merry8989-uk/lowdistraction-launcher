@@ -37,9 +37,37 @@ KOTLIN_ENUMS = {
     "ExportChannel": "export_channel",
     "DiagAction": "diagnostics_action",
     "TeaAction": "tea_action",
+    "Category": "category",
 }
 
-CALL_START = re.compile(r"\blog\(\s*c\s*,\s*\"([a-z0-9_]+)\"\s*,\s*\"([a-z]+)\"")
+# Kotlin constant -> schema value, for Category.X.value
+CATEGORY_CONST = {
+    "APPLICATION": "application",
+    "ACTIVITY": "activity",
+    "ERROR": "error",
+    "SECURITY": "security",
+    "PERFORMANCE": "performance",
+    "AUDIT": "audit",
+    "BACKGROUND": "background",
+    "DEBUG": "debug",
+}
+
+# name, level, category — a call without a category will not match at all, so the
+# "declared but never logged" check catches it.
+CALL_START = re.compile(
+    r"\blog\(\s*c\s*,\s*\"([a-z0-9_]+)\"\s*,\s*\"([a-z]+)\"\s*,\s*"
+    r"([A-Za-z_][A-Za-z0-9_.]*)"
+)
+
+
+def category_of(expr):
+    """The schema value behind a Category.X.value reference or a literal."""
+    m = re.fullmatch(r"Category\.([A-Z_]+)\.value", expr)
+    if m:
+        return CATEGORY_CONST.get(m.group(1))
+    if len(expr) > 1 and expr.startswith('"') and expr.endswith('"'):
+        return expr[1:-1]
+    return None
 KEY_ANY = re.compile(r"\"([a-z0-9_]+)\"\s*to\s")
 KEY_LITERAL = re.compile(r"\"([a-z0-9_]+)\"\s*to\s*\"([^\"]*)\"")
 
@@ -71,6 +99,7 @@ def validate():
 
     for m in CALL_START.finditer(text):
         name, level = m.group(1), m.group(2)
+        category = category_of(m.group(3))
         end = find_call_end(text, m.start() + text[m.start():].index("("))
         body = text[m.end():end]
 
@@ -84,6 +113,19 @@ def validate():
             problems.append(f"{name}: level '{level}' but the schema says '{spec['level']}'")
         if level not in enums["log_level"]:
             problems.append(f"{name}: '{level}' is not a valid log_level")
+
+        want_category = spec.get("category")
+        if category is None:
+            problems.append(
+                f"{name}: category must be Category.X.value or a literal, "
+                f"got '{m.group(3)}'"
+            )
+        elif category not in enums["category"]:
+            problems.append(f"{name}: category '{category}' is not a schema category")
+        elif want_category and category != want_category:
+            problems.append(
+                f"{name}: category '{category}' but the schema says '{want_category}'"
+            )
 
         keys = set(KEY_ANY.findall(body))
         literals = dict(KEY_LITERAL.findall(body))

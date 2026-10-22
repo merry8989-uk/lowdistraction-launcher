@@ -1,0 +1,18 @@
+Every log category the app can honestly produce is now collected
+
+- Every record now carries a category, so the log says what kind of thing
+  happened and not only which event fired: application, activity, error,
+  security, performance, audit, background or debug.
+- All six severity levels are in use — trace, debug, info, warn, error, fatal.
+  A crash is now FATAL rather than merely an error, which is what it is.
+- Two genuinely missing logs were added: the background walk of storage
+  (file index rebuild — how long it took, what it found, whether it failed),
+  and the bubble stepping aside over a payment or government app.
+- app_id joined the envelope alongside the app version and device.
+- The report gains a Log categories section that counts each category, and a
+  Performance section with real memory figures (heap used, system free and
+  total, low-memory flag) plus the slowest render, list load and file search.
+  A category sitting at zero is honest: it applies and simply has not happened.
+- Some categories genuinely do not exist here and are declared as such, with the
+  reason: there is no server, no database, no network and no analytics. Nothing
+  is invented to fill them.

@@ -19,8 +19,8 @@ android {
         applicationId = "com.lowdistraction.launcher"
         minSdk = 26
         targetSdk = 34
-        versionCode = 35
-        versionName = "1.34"
+        versionCode = 36
+        versionName = "1.35"
     }
 
     signingConfigs {

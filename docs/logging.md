@@ -5,7 +5,10 @@ diagnosed from a report the user sends, instead of from guesswork. The schema is
 shared with the ProGallery logging standard, so events from both can be joined
 and compared.
 
-Schema version: **1.0.0** · canonical definition: [`tools/logging_schema.json`](../tools/logging_schema.json)
+Schema version: **1.1.0** · canonical definition: [`tools/logging_schema.json`](../tools/logging_schema.json)
+
+Version 1.1.0 added the six severity levels, a **category** on every event, and
+`app_id` in the envelope.
 
 ## The one rule
 
@@ -35,8 +38,29 @@ leave the phone when the user exports, shares or mails it.
 Every event carries these keys, added automatically by `Diag`:
 
 `event_name` · `schema_version` · `timestamp` (ISO 8601 UTC) · `session_id` ·
-`platform` · `app_version` · `os` · `device_model` · `network_type` ·
-`screen_or_route` · `log_level` · `release_channel`
+`platform` · `app_id` · `app_version` · `os` · `device_model` · `network_type` ·
+`screen_or_route` · `category` · `log_level` · `release_channel`
+
+Two fields the standard asks for are carried by something already here, rather
+than duplicated:
+
+- **`severity`** is `log_level`.
+- **`environment`** is `release_channel` (production / beta).
+- **`request_id`** does not exist, because there are no requests. `attempt_id`
+  links one user action to its outcome instead.
+
+### Severity
+
+The six levels the standard lists are all used:
+
+| Level | Used for |
+| --- | --- |
+| `trace` | available; nothing is fine-grained enough to need it yet |
+| `debug` | internals worth knowing when something misbehaves — the bubble stepping aside, say |
+| `info` | ordinary events: screens, launches, searches, settings |
+| `warn` | a potential problem: rage taps, freezes, an error put on screen |
+| `error` | an operation failed: a file index rebuild, a report that would not write |
+| `fatal` | a crash |
 
 `attempt_id` is added where an action has an outcome. Event-specific properties
 sit alongside these as flat keys.
@@ -60,19 +84,49 @@ there is no identifier to hash — and none is invented to fill the gap.
 
 **Health** — `performance_marker`, `error_state_shown`, `crash`, `anr`
 
+**Background** — `file_index_rebuild`
+
+**Debug** — `bubble_hidden`
+
 **Friction signals** — `rage_tap`, `dead_click`, `back_button_spam`,
 `scroll_depth`, `time_to_first_value`
 
 The per-event properties, levels and enums are all in the schema file; that is
 the single source of truth, and CI enforces it.
 
+## The twelve categories, mapped
+
+The shared standard lists twelve kinds of log. This is what each one means for a
+local, offline Android launcher — including the ones that cannot exist here.
+
+| # | Category | Here |
+| --- | --- | --- |
+| 1 | Application | **yes** — `session_start`, screens, launches, settings |
+| 2 | Error | **yes** — `crash` (fatal), `anr`, `error_state_shown` |
+| 3 | Security | **yes** — `permission_state_resolved`, `access_fix_requested`/`_result`, `permission_loop`. No logins and no requests exist to log |
+| 4 | Performance | **yes** — `performance_marker`, `app_list_loaded`, `media_query_result`, plus memory in the report |
+| 5 | User activity | **yes** — searches, scroll depth, rage taps, dead clicks, guide steps, tea mode |
+| 6 | Server & infrastructure | **no** — there is no server, no deployment and no service to monitor |
+| 7 | API & network | **no** — the app has no internet permission, so it can never make a call |
+| 8 | Database | **no** — nothing is stored beyond SharedPreferences and the log file |
+| 9 | Audit | **yes** — `settings_changed` and `diagnostics_action`: who changed what, when, and which setting |
+| 10 | Analytics & business | **no** — deliberately. No trackers, no telemetry, no upload. The report's **Signals** and **Log health** sections are the local equivalent |
+| 11 | Background jobs | **yes** — `file_index_rebuild`, the one real background job: a walk of storage |
+| 12 | Debug & trace | **yes** — `bubble_hidden` at `debug` level; distributed tracing does not apply to one process on one device |
+
+Every event carries a `category`, the report prints a count per category, and
+the schema check in CI fails if an event's category is missing or does not match
+the schema. A category sitting at zero in the report is honest: it says the
+category applies and simply has not happened yet.
+
 ### Not applicable here
 
 `api_request`, `page_view`, `web_vitals`, `js_error`, `form_start`,
-`form_abandon`, `form_submit`, `conversion`, `feedback_submitted` and
-`session_replay_marker` are declared in the schema as **not applicable**. The
-first is the interesting one: this app cannot make a network call, so it can
-never log one. The web-only events and session replay simply do not exist here.
+`form_abandon`, `form_submit`, `conversion`, `feedback_submitted`,
+`session_replay_marker`, `login`, and the server/database/tracing rows above are
+declared in the schema as **not applicable**, each with the reason. The first is
+the interesting one: this app cannot make a network call, so it can never log
+one.
 
 ## Privacy
 
@@ -105,9 +159,12 @@ kept.
 
 **Consent / opt-out:** Settings → **Record diagnostics**, on by default. While
 it is off, nothing at all is written — not even the event that would record the
-switch being turned off. Access to the log is limited to whoever holds the
-phone: it is the app's own private file, and it leaves only through the export,
-share or mail buttons.
+switch being turned off.
+
+**Access control:** the log is the app's own private file. No other app on the
+phone can read it, there is no server that holds a copy, and it leaves only
+through the export, share or mail buttons the user presses themselves. There is
+no dashboard to restrict, because there is no dashboard.
 
 ## Adding an event
 

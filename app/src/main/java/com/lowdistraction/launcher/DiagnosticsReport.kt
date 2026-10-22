@@ -56,6 +56,8 @@ object DiagnosticsReport {
         sections.add(Section("Device", deviceRows(context)))
         sections.add(Section("Launcher settings", settingsRows(context)))
         sections.add(Section("Permissions", permissionRows(context)))
+        sections.add(Section("Log categories", categoryRows(events)))
+        sections.add(Section("Performance", performanceRows(context, events)))
         sections.add(Section("Signals", signalRows(events)))
         sections.add(Section("Log health", healthRows(events)))
         sections.add(Section("Privacy", privacyRows()))
@@ -216,6 +218,55 @@ object DiagnosticsReport {
         return out
     }
 
+    /**
+     * The categories the shared standard lists, with what this app collected for
+     * each. A zero is honest too: it says the category applies but has not
+     * happened yet, rather than hiding it.
+     */
+    private fun categoryRows(events: List<Diag.Event>): List<Row> = buildList {
+        for (category in CATEGORIES) {
+            val n = events.count { it.category == category }
+            add(Row(category, n.toString()))
+        }
+        add(
+            Row(
+                "not collected",
+                "database, api/network, server — this app has none of them"
+            )
+        )
+    }
+
+    /** Memory and the performance markers, so "it felt slow" has a number. */
+    private fun performanceRows(c: Context, events: List<Diag.Event>): List<Row> = buildList {
+        val runtime = Runtime.getRuntime()
+        val used = runtime.totalMemory() - runtime.freeMemory()
+        add(Row("Heap used", humanSize(used) + " of " + humanSize(runtime.maxMemory())))
+        runCatching {
+            val am = c.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+            val info = android.app.ActivityManager.MemoryInfo()
+            am.getMemoryInfo(info)
+            add(Row("System free", humanSize(info.availMem)))
+            add(Row("System total", humanSize(info.totalMem)))
+            add(Row("Low memory", info.lowMemory.toString()))
+            add(Row("Memory class", am.memoryClass.toString() + " MB"))
+        }
+        val markers = events.filter { it.name == "performance_marker" }
+        add(Row("Slow renders", markers.size.toString() + " over 16 ms"))
+        val slowest = markers.mapNotNull { it.props["duration_ms"]?.toLongOrNull() }.maxOrNull()
+        add(Row("Slowest render", if (slowest == null) "—" else "$slowest ms"))
+        val loads = events.filter { it.name == "app_list_loaded" }
+            .mapNotNull { it.props["query_ms"]?.toLongOrNull() }
+        add(Row("Slowest list load", if (loads.isEmpty()) "—" else loads.maxOrNull().toString() + " ms"))
+        val queries = events.filter { it.name == "media_query_result" }
+            .mapNotNull { it.props["query_ms"]?.toLongOrNull() }
+        add(
+            Row(
+                "Slowest file search",
+                if (queries.isEmpty()) "—" else queries.maxOrNull().toString() + " ms"
+            )
+        )
+    }
+
     private fun privacyRows(): List<Row> = buildList {
         add(Row("Never logged", "email, phone, names, location, raw file paths"))
         add(Row("Never logged", "media file names, raw search queries, auth tokens"))
@@ -224,6 +275,7 @@ object DiagnosticsReport {
         add(Row("User identifier", "none — the app has no accounts, not even a hash"))
         add(Row("Retention", "14 days, pruned automatically on start"))
         add(Row("Size cap", "512 KB, rotated automatically"))
+        add(Row("Access", "the app's private storage; nothing else on the phone can read it"))
         add(Row("Sampling", "high-volume info events 1 in 5; errors always kept"))
         add(Row("Transport", "none — the app cannot reach the network at all"))
         add(Row("Opt-out", "Settings → Record diagnostics"))
@@ -352,7 +404,9 @@ object DiagnosticsReport {
     /** One row per event, with every property as a column. */
     fun renderCsv(r: Report): String {
         val columns = ArrayList<String>()
-        for (k in listOf("timestamp", "log_level", "event_name", "session_id", "screen_or_route")) {
+        for (k in listOf(
+            "timestamp", "log_level", "category", "event_name", "session_id", "screen_or_route"
+        )) {
             columns.add(k)
         }
         val extra = LinkedHashSet<String>()
@@ -365,6 +419,7 @@ object DiagnosticsReport {
             val cells = ArrayList<String>()
             cells.add(Diag.stamp(e.time))
             cells.add(e.level)
+            cells.add(e.category)
             cells.add(e.name)
             cells.add(e.session)
             cells.add(e.screen)
@@ -389,6 +444,12 @@ object DiagnosticsReport {
 
     private fun isoLocal(time: Long): String =
         SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ", Locale.US).format(Date(time))
+
+    /** The categories this app can produce, in the order the report lists them. */
+    private val CATEGORIES = listOf(
+        "application", "activity", "error", "security",
+        "performance", "audit", "background", "debug"
+    )
 
     private fun granted(ok: Boolean) = if (ok) "granted" else "not granted"
 

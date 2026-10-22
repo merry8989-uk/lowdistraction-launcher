@@ -79,14 +79,36 @@ object Events {
         ENDED_EARLY("ended_early")
     }
 
-    private fun log(c: Context, name: String, level: String, vararg props: Pair<String, Any?>) {
-        Diag.event(c, name, level, props.toList())
+    /**
+     * Which kind of log an event is. The twelve categories the shared standard
+     * lists are mapped onto what this app can actually produce — see
+     * docs/logging.md for the mapping and for what does not apply here.
+     */
+    enum class Category(val value: String) {
+        APPLICATION("application"),
+        ACTIVITY("activity"),
+        ERROR("error"),
+        SECURITY("security"),
+        PERFORMANCE("performance"),
+        AUDIT("audit"),
+        BACKGROUND("background"),
+        DEBUG("debug")
+    }
+
+    private fun log(
+        c: Context,
+        name: String,
+        level: String,
+        category: String,
+        vararg props: Pair<String, Any?>
+    ) {
+        Diag.event(c, name, level, category, props.toList())
     }
 
     // -------------------------------------------------------------- session
     fun sessionStart(c: Context, startType: StartType, coldMs: Long, warmMs: Long) =
         log(
-            c, "session_start", "info",
+            c, "session_start", "info", Category.APPLICATION.value,
             "start_type" to startType.value,
             "cold_start_ms" to (if (coldMs > 0) coldMs else null),
             "warm_start_ms" to (if (warmMs > 0) warmMs else null)
@@ -94,7 +116,7 @@ object Events {
 
     fun dropOff(c: Context, lastScreen: String, lastEvent: String, durationMs: Long) =
         log(
-            c, "drop_off", "info",
+            c, "drop_off", "info", Category.ACTIVITY.value,
             "last_screen" to lastScreen,
             "last_event" to lastEvent,
             "duration_ms" to durationMs
@@ -109,7 +131,7 @@ object Events {
         val duration = Diag.timeOnScreenMs()
         Diag.setScreen(name)
         log(
-            c, "screen_view", "info",
+            c, "screen_view", "info", Category.ACTIVITY.value,
             "screen_name" to name,
             "previous_screen" to previous,
             "duration_ms" to duration
@@ -123,7 +145,7 @@ object Events {
         state: PermState,
         itemCount: Int?
     ) = log(
-        c, "permission_state_resolved", "info",
+        c, "permission_state_resolved", "info", Category.SECURITY.value,
         "permission" to permission,
         "state" to state.value,
         "item_count" to itemCount
@@ -143,7 +165,7 @@ object Events {
     ) {
         val attempts = Diag.bumpFixAttempt(permission)
         log(
-            c, "access_fix_requested", "info",
+            c, "access_fix_requested", "info", Category.SECURITY.value,
             "permission" to permission,
             "state_before" to before.value,
             "attempt_id" to attemptId,
@@ -160,7 +182,7 @@ object Events {
         outcome: Outcome,
         errorCode: String?
     ) = log(
-        c, "access_fix_result", "info",
+        c, "access_fix_result", "info", Category.SECURITY.value,
         "attempt_id" to attemptId,
         "action_taken" to actionTaken,
         "state_after" to after.value,
@@ -170,7 +192,7 @@ object Events {
 
     fun permissionLoop(c: Context, permission: String, attempts: Int) =
         log(
-            c, "permission_loop", "warn",
+            c, "permission_loop", "warn", Category.SECURITY.value,
             "permission" to permission,
             "attempts" to attempts
         )
@@ -183,7 +205,7 @@ object Events {
         queryMs: Long,
         folders: Int?
     ) = log(
-        c, "media_query_result", "info",
+        c, "media_query_result", "info", Category.PERFORMANCE.value,
         "source" to source.value,
         "item_count" to itemCount,
         "query_ms" to queryMs,
@@ -192,7 +214,7 @@ object Events {
 
     fun appListLoaded(c: Context, itemCount: Int, queryMs: Long, hidden: Int, sortMode: String) =
         log(
-            c, "app_list_loaded", "info",
+            c, "app_list_loaded", "info", Category.PERFORMANCE.value,
             "item_count" to itemCount,
             "query_ms" to queryMs,
             "hidden_count" to hidden,
@@ -207,7 +229,7 @@ object Events {
         pauseEnabled: Boolean,
         attemptId: String
     ) = log(
-        c, "app_launch_requested", "info",
+        c, "app_launch_requested", "info", Category.ACTIVITY.value,
         "package" to pkg,
         "source" to source.value,
         "pause_enabled" to pauseEnabled,
@@ -221,7 +243,7 @@ object Events {
         outcome: Outcome,
         waitedMs: Long
     ) = log(
-        c, "app_launch_result", "info",
+        c, "app_launch_result", "info", Category.ACTIVITY.value,
         "package" to pkg,
         "attempt_id" to attemptId,
         "outcome" to outcome.value,
@@ -232,7 +254,7 @@ object Events {
     /** Only the length of the query is recorded — never the query itself. */
     fun searchPerformed(c: Context, queryLength: Int, resultCount: Int, source: SearchSource) =
         log(
-            c, "search_performed", "info",
+            c, "search_performed", "info", Category.ACTIVITY.value,
             "query_length" to queryLength,
             "result_count" to resultCount,
             "source" to source.value
@@ -240,7 +262,7 @@ object Events {
 
     fun searchNoResults(c: Context, queryLength: Int, source: SearchSource) =
         log(
-            c, "search_no_results", "info",
+            c, "search_no_results", "info", Category.ACTIVITY.value,
             "query_length" to queryLength,
             "source" to source.value
         )
@@ -248,14 +270,14 @@ object Events {
     // -------------------------------------------------------------- settings
     fun settingsChanged(c: Context, setting: String, value: String?) =
         log(
-            c, "settings_changed", "info",
+            c, "settings_changed", "info", Category.AUDIT.value,
             "setting" to setting,
             "value" to value
         )
 
     fun diagnosticsToggled(c: Context, enabled: Boolean) =
         log(
-            c, "diagnostics_action", "info",
+            c, "diagnostics_action", "info", Category.AUDIT.value,
             "action" to "toggle",
             "value" to enabled
         )
@@ -268,7 +290,7 @@ object Events {
         bytes: Long?,
         entries: Int?
     ) = log(
-        c, "diagnostics_action", "info",
+        c, "diagnostics_action", "info", Category.AUDIT.value,
         "action" to action.value,
         "format" to format?.value,
         "channel" to channel?.value,
@@ -277,29 +299,29 @@ object Events {
     )
 
     fun bubbleToggled(c: Context, enabled: Boolean) =
-        log(c, "bubble_toggled", "info", "enabled" to enabled)
+        log(c, "bubble_toggled", "info", Category.ACTIVITY.value, "enabled" to enabled)
 
     // ----------------------------------------------------------------- guide
     fun guideStep(c: Context, step: Int, total: Int) =
-        log(c, "guide_step", "info", "step" to step, "total" to total)
+        log(c, "guide_step", "info", Category.ACTIVITY.value, "step" to step, "total" to total)
 
     fun guideFinished(c: Context, stepsSeen: Int, skipped: Boolean) =
-        log(c, "guide_finished", "info", "steps_seen" to stepsSeen, "skipped" to skipped)
+        log(c, "guide_finished", "info", Category.ACTIVITY.value, "steps_seen" to stepsSeen, "skipped" to skipped)
 
     fun teaMode(c: Context, action: TeaAction, durationMs: Long?) =
         log(
-            c, "tea_mode", "info",
+            c, "tea_mode", "info", Category.ACTIVITY.value,
             "action" to action.value,
             "duration_ms" to durationMs
         )
 
     // ------------------------------------------------------------ health
     fun performanceMarker(c: Context, flow: String, durationMs: Long) =
-        log(c, "performance_marker", "info", "flow" to flow, "duration_ms" to durationMs)
+        log(c, "performance_marker", "info", Category.PERFORMANCE.value, "flow" to flow, "duration_ms" to durationMs)
 
     fun errorStateShown(c: Context, errorCode: String, screen: String, messageKey: String?) =
         log(
-            c, "error_state_shown", "warn",
+            c, "error_state_shown", "warn", Category.ERROR.value,
             "error_code" to errorCode,
             "screen" to screen,
             "message_key" to messageKey
@@ -313,7 +335,7 @@ object Events {
         lastAction: String,
         thread: String
     ) = log(
-        c, "crash", "error",
+        c, "crash", "fatal", Category.ERROR.value,
         "fatal" to true,
         "exception_type" to exceptionType,
         "stack_trace_hash" to stackHash,
@@ -323,31 +345,50 @@ object Events {
     )
 
     fun anr(c: Context, durationMs: Long, screen: String) =
-        log(c, "anr", "warn", "duration_ms" to durationMs, "last_screen" to screen)
+        log(c, "anr", "warn", Category.ERROR.value, "duration_ms" to durationMs, "last_screen" to screen)
 
     // ------------------------------------------------------------- signals
     fun rageTap(c: Context, target: String, taps: Int, windowMs: Long) =
         log(
-            c, "rage_tap", "warn",
+            c, "rage_tap", "warn", Category.ACTIVITY.value,
             "target" to target,
             "taps" to taps,
             "window_ms" to windowMs
         )
 
     fun deadClick(c: Context, target: String) =
-        log(c, "dead_click", "info", "target" to target)
+        log(c, "dead_click", "info", Category.ACTIVITY.value, "target" to target)
 
     fun backButtonSpam(c: Context, presses: Int, windowMs: Long, screen: String) =
         log(
-            c, "back_button_spam", "warn",
+            c, "back_button_spam", "warn", Category.ACTIVITY.value,
             "presses" to presses,
             "window_ms" to windowMs,
             "screen" to screen
         )
 
     fun scrollDepth(c: Context, percent: Int, screen: String) =
-        log(c, "scroll_depth", "info", "percent" to percent, "screen" to screen)
+        log(c, "scroll_depth", "info", Category.ACTIVITY.value, "percent" to percent, "screen" to screen)
 
     fun timeToFirstValue(c: Context, flow: String, durationMs: Long) =
-        log(c, "time_to_first_value", "info", "flow" to flow, "duration_ms" to durationMs)
+        log(c, "time_to_first_value", "info", Category.PERFORMANCE.value, "flow" to flow, "duration_ms" to durationMs)
+
+    // ----------------------------------------------------------- background
+    fun fileIndexRebuild(
+        c: Context,
+        outcome: Outcome,
+        itemCount: Int?,
+        durationMs: Long?,
+        trigger: String?
+    ) = log(
+        c, "file_index_rebuild", "info", Category.BACKGROUND.value,
+        "outcome" to outcome.value,
+        "item_count" to itemCount,
+        "duration_ms" to durationMs,
+        "trigger" to trigger
+    )
+
+    // ----------------------------------------------------------------- debug
+    fun bubbleHidden(c: Context, reason: String) =
+        log(c, "bubble_hidden", "debug", Category.DEBUG.value, "reason" to reason)
 }

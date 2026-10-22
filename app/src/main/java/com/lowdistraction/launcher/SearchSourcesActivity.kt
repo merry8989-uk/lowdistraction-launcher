@@ -367,8 +367,16 @@ class SearchSourcesActivity : Activity() {
     private fun rebuildIndex() {
         Toast.makeText(this, R.string.files_indexing, Toast.LENGTH_SHORT).show()
         Thread {
-            runCatching { FileIndex.rebuild(this) }
+            val startedAt = System.currentTimeMillis()
+            val ok = runCatching { FileIndex.rebuild(this) }.isSuccess
             val count = runCatching { FileIndex.count(this) }.getOrDefault(0)
+            Events.fileIndexRebuild(
+                this,
+                if (ok) Events.Outcome.SUCCESS else Events.Outcome.FAILED,
+                count,
+                System.currentTimeMillis() - startedAt,
+                "manual"
+            )
             runOnUiThread {
                 Toast.makeText(this, getString(R.string.files_rebuild_done, count), Toast.LENGTH_LONG)
                     .show()

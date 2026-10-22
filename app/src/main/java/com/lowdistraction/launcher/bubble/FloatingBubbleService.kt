@@ -93,6 +93,7 @@ class FloatingBubbleService : Service() {
             if (!bubbleHidden) {
                 bubble?.let { runCatching { wm.removeView(it) } }
                 bubbleHidden = true
+                Events.bubbleHidden(this, "sensitive_app")
             }
         } else if (bubbleHidden) {
             val view = bubble

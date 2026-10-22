@@ -46,7 +46,7 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 object Diag {
 
-    const val SCHEMA_VERSION = "1.0.0"
+    const val SCHEMA_VERSION = "1.1.0"
     const val PLATFORM = "android"
     const val RELEASE_CHANNEL = "production"
 
@@ -74,14 +74,15 @@ object Diag {
     /** Keys that belong to the envelope rather than to an individual event. */
     val ENVELOPE = setOf(
         "event_name", "schema_version", "timestamp", "session_id", "attempt_id",
-        "platform", "app_version", "os", "device_model", "network_type",
-        "screen_or_route", "log_level", "release_channel"
+        "platform", "app_id", "app_version", "os", "device_model", "network_type",
+        "screen_or_route", "category", "log_level", "release_channel"
     )
 
     data class Event(
         val name: String,
         val time: Long,
         val level: String,
+        val category: String,
         val screen: String,
         val session: String,
         val props: Map<String, String>
@@ -229,12 +230,18 @@ object Diag {
      * The one low-level writer. **Only [Events] should call this** — the CI
      * schema check relies on that.
      */
-    fun event(c: Context, name: String, level: String, props: List<Pair<String, Any?>>) {
+    fun event(
+        c: Context,
+        name: String,
+        level: String,
+        category: String,
+        props: List<Pair<String, Any?>>
+    ) {
         if (!isEnabled(c)) return
         if (name in SAMPLED && level == "info" && sampleCounter.incrementAndGet() % SAMPLE_1_IN != 0) {
             return
         }
-        val line = runCatching { line(c, name, level, props) }.getOrNull() ?: return
+        val line = runCatching { line(c, name, level, category, props) }.getOrNull() ?: return
         enqueue(c, line)
     }
 
@@ -243,6 +250,7 @@ object Diag {
         c: Context,
         name: String,
         level: String,
+        category: String,
         props: List<Pair<String, Any?>>
     ): String {
         val o = JSONObject()
@@ -251,11 +259,13 @@ object Diag {
         o.put("timestamp", isoUtc(System.currentTimeMillis()))
         o.put("session_id", sessionId())
         o.put("platform", PLATFORM)
+        o.put("app_id", c.packageName)
         o.put("app_version", appVersion(c))
         o.put("os", osName())
         o.put("device_model", deviceModel())
         o.put("network_type", networkType(c))
         o.put("screen_or_route", currentScreen)
+        o.put("category", category)
         o.put("log_level", level)
         o.put("release_channel", RELEASE_CHANNEL)
 
@@ -332,6 +342,7 @@ object Diag {
             out.add(
                 Event(
                     name, time, level,
+                    o.optString("category", "application"),
                     o.optString("screen_or_route", "—"),
                     o.optString("session_id", ""),
                     props

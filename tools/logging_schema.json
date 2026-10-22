@@ -1,7 +1,7 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "1.1.0",
   "title": "Low Distraction — diagnostics event schema",
-  "description": "One structured schema for every event the launcher records. Modelled on the shared ProGallery logging standard so app and web data can be joined. Bump schema_version on any breaking change.",
+  "description": "One structured schema for every event the launcher records. Modelled on the shared ProGallery logging standard so app and web data can be joined. Bump schema_version on any breaking change. Version 1.1.0 adds the six severity levels (trace/debug/info/warn/error/fatal), a category on every event, and app_id in the envelope.",
   "envelope": {
     "required": [
       "event_name",
@@ -13,7 +13,9 @@
       "os",
       "device_model",
       "screen_or_route",
-      "log_level"
+      "log_level",
+      "category",
+      "app_id"
     ],
     "optional": [
       "attempt_id",
@@ -21,15 +23,19 @@
       "release_channel"
     ],
     "omitted": {
-      "user_id": "The app has no accounts and no sign-in, so there is no identifier to hash. Nothing is sent in its place."
+      "user_id": "The app has no accounts and no sign-in, so there is no identifier to hash. Nothing is sent in its place.",
+      "request_id": "There are no requests to correlate: the app makes no network calls. attempt_id links one user action to its outcome instead.",
+      "environment": "release_channel carries the same meaning (production / beta) and is already present."
     }
   },
   "enums": {
     "log_level": [
+      "trace",
       "debug",
       "info",
       "warn",
-      "error"
+      "error",
+      "fatal"
     ],
     "platform": [
       "android"
@@ -100,6 +106,16 @@
       "start",
       "end",
       "ended_early"
+    ],
+    "category": [
+      "application",
+      "activity",
+      "error",
+      "security",
+      "performance",
+      "audit",
+      "background",
+      "debug"
     ]
   },
   "events": {
@@ -112,7 +128,8 @@
       "optional": [
         "cold_start_ms",
         "warm_start_ms"
-      ]
+      ],
+      "category": "application"
     },
     "drop_off": {
       "level": "info",
@@ -123,7 +140,8 @@
       ],
       "optional": [
         "duration_ms"
-      ]
+      ],
+      "category": "activity"
     },
     "screen_view": {
       "level": "info",
@@ -134,7 +152,8 @@
       ],
       "optional": [
         "duration_ms"
-      ]
+      ],
+      "category": "activity"
     },
     "permission_state_resolved": {
       "level": "info",
@@ -145,7 +164,8 @@
       ],
       "optional": [
         "item_count"
-      ]
+      ],
+      "category": "security"
     },
     "access_fix_requested": {
       "level": "info",
@@ -157,7 +177,8 @@
       ],
       "optional": [
         "action_taken"
-      ]
+      ],
+      "category": "security"
     },
     "access_fix_result": {
       "level": "info",
@@ -170,7 +191,8 @@
         "action_taken",
         "state_after",
         "error_code"
-      ]
+      ],
+      "category": "security"
     },
     "media_query_result": {
       "level": "info",
@@ -182,7 +204,8 @@
       ],
       "optional": [
         "folders_visible"
-      ]
+      ],
+      "category": "performance"
     },
     "app_list_loaded": {
       "level": "info",
@@ -194,7 +217,8 @@
       "optional": [
         "hidden_count",
         "sort_mode"
-      ]
+      ],
+      "category": "performance"
     },
     "app_launch_requested": {
       "level": "info",
@@ -206,7 +230,8 @@
       "optional": [
         "pause_enabled",
         "attempt_id"
-      ]
+      ],
+      "category": "activity"
     },
     "app_launch_result": {
       "level": "info",
@@ -218,7 +243,8 @@
       "optional": [
         "attempt_id",
         "waited_ms"
-      ]
+      ],
+      "category": "activity"
     },
     "search_performed": {
       "level": "info",
@@ -228,7 +254,8 @@
         "result_count",
         "source"
       ],
-      "optional": []
+      "optional": [],
+      "category": "activity"
     },
     "search_no_results": {
       "level": "info",
@@ -239,7 +266,8 @@
       ],
       "optional": [
         "filters"
-      ]
+      ],
+      "category": "activity"
     },
     "settings_changed": {
       "level": "info",
@@ -249,7 +277,8 @@
       ],
       "optional": [
         "value"
-      ]
+      ],
+      "category": "audit"
     },
     "diagnostics_action": {
       "level": "info",
@@ -263,7 +292,8 @@
         "bytes",
         "entries",
         "value"
-      ]
+      ],
+      "category": "audit"
     },
     "bubble_toggled": {
       "level": "info",
@@ -271,7 +301,8 @@
       "required": [
         "enabled"
       ],
-      "optional": []
+      "optional": [],
+      "category": "activity"
     },
     "guide_step": {
       "level": "info",
@@ -280,7 +311,8 @@
         "step",
         "total"
       ],
-      "optional": []
+      "optional": [],
+      "category": "activity"
     },
     "guide_finished": {
       "level": "info",
@@ -290,7 +322,8 @@
       ],
       "optional": [
         "skipped"
-      ]
+      ],
+      "category": "activity"
     },
     "tea_mode": {
       "level": "info",
@@ -300,7 +333,8 @@
       ],
       "optional": [
         "duration_ms"
-      ]
+      ],
+      "category": "activity"
     },
     "performance_marker": {
       "level": "info",
@@ -311,7 +345,8 @@
       ],
       "optional": [
         "frame_drops"
-      ]
+      ],
+      "category": "performance"
     },
     "error_state_shown": {
       "level": "warn",
@@ -322,10 +357,11 @@
       ],
       "optional": [
         "message_key"
-      ]
+      ],
+      "category": "error"
     },
     "crash": {
-      "level": "error",
+      "level": "fatal",
       "when": "An uncaught exception",
       "required": [
         "fatal",
@@ -336,7 +372,8 @@
         "last_screen",
         "last_action",
         "thread"
-      ]
+      ],
+      "category": "error"
     },
     "anr": {
       "level": "warn",
@@ -346,7 +383,8 @@
       ],
       "optional": [
         "last_screen"
-      ]
+      ],
+      "category": "error"
     },
     "rage_tap": {
       "level": "warn",
@@ -356,7 +394,8 @@
         "taps",
         "window_ms"
       ],
-      "optional": []
+      "optional": [],
+      "category": "activity"
     },
     "dead_click": {
       "level": "info",
@@ -364,7 +403,8 @@
       "required": [
         "target"
       ],
-      "optional": []
+      "optional": [],
+      "category": "activity"
     },
     "permission_loop": {
       "level": "warn",
@@ -373,7 +413,8 @@
         "permission",
         "attempts"
       ],
-      "optional": []
+      "optional": [],
+      "category": "security"
     },
     "back_button_spam": {
       "level": "warn",
@@ -384,7 +425,8 @@
       ],
       "optional": [
         "screen"
-      ]
+      ],
+      "category": "activity"
     },
     "scroll_depth": {
       "level": "info",
@@ -393,7 +435,8 @@
         "percent",
         "screen"
       ],
-      "optional": []
+      "optional": [],
+      "category": "activity"
     },
     "time_to_first_value": {
       "level": "info",
@@ -401,6 +444,29 @@
       "required": [
         "flow",
         "duration_ms"
+      ],
+      "optional": [],
+      "category": "performance"
+    },
+    "file_index_rebuild": {
+      "category": "background",
+      "level": "info",
+      "when": "The background walk of storage finishes (or fails)",
+      "required": [
+        "outcome"
+      ],
+      "optional": [
+        "item_count",
+        "duration_ms",
+        "trigger"
+      ]
+    },
+    "bubble_hidden": {
+      "category": "debug",
+      "level": "debug",
+      "when": "The bubble steps aside over a payment or government app",
+      "required": [
+        "reason"
       ],
       "optional": []
     }
@@ -416,7 +482,14 @@
     "conversion": "Web-only event.",
     "feedback_submitted": "Web-only event.",
     "session_replay_marker": "No session replay is recorded anywhere in the app.",
-    "user_id": "No accounts, so no identifier — not even a hashed one."
+    "user_id": "No accounts, so no identifier — not even a hashed one.",
+    "database": "No database. Nothing is stored beyond SharedPreferences and one log file.",
+    "database_logs": "No database to log against.",
+    "server": "There is no server. The app is the whole product.",
+    "infrastructure": "No servers, no deployment, no services to monitor.",
+    "distributed_tracing": "One process on one device; there is no request to trace across services.",
+    "login": "No accounts and no sign-in, so there are no login attempts to log.",
+    "analytics": "Analytics are deliberately absent: no trackers, no telemetry, no upload. The Signals and Log health sections of the report are the local equivalent."
   },
   "privacy": {
     "never_logged": [
