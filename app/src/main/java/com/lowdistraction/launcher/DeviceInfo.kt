@@ -18,7 +18,6 @@ import android.view.WindowManager
 import com.lowdistraction.launcher.bubble.BubblePrefs
 import java.io.File
 import java.net.NetworkInterface
-import java.util.Locale
 
 /**
  * Collects device information from public APIs for the Dev.Check window.

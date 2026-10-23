@@ -9,7 +9,6 @@
     <string name="devcheck_settings">Settings</string>
     <string name="settings_row_devcheck">Dev.Check shortcuts</string>
     <string name="settings_devcheck_desc">Show device-info shortcuts in the right search bar</string>
-    <string name="devcheck_close">Close</string>
     <string name="no_apps">No apps found</string>
     <string name="action_app_info">App info</string>
     <string name="action_uninstall">Uninstall</string>
@@ -57,12 +56,6 @@
     <string name="sensitive_paused_message">It was switched off automatically while a payment or government app was open. Turn it back on to bring the bubble\'s Back, Home and Lock actions back.</string>
     <string name="sensitive_paused_ok">Open accessibility settings</string>
 
-    <string name="settings_row_files">Search inside files</string>
-    <string name="files_none">No folders added</string>
-    <string name="files_add">Add a folder…</string>
-    <string name="files_rebuild">Rebuild index</string>
-    <string name="files_remove">Remove %1$s</string>
-    <string name="files_desc">%1$d folder(s), %2$d items indexed</string>
     <string name="files_indexing">Indexing…</string>
     <string name="files_rebuild_done">Indexed %1$d items</string>
     <string name="files_empty">That folder is empty</string>
@@ -191,7 +184,6 @@
     <string name="pin_cols">Columns</string>
     <string name="settings_row_wheel_sound">Wheel sound</string>
     <string name="wheel_sound_title">Wheel sound</string>
-    <string name="wheel_sound_hint">Tap one to hear it. It plays as the wheel spins.</string>
 
     <!-- Pause before opening -->
     <string name="settings_row_pause">Pause before opening apps</string>
@@ -284,13 +276,7 @@
     <string name="accessibility_service_description">Lets the assistive bubble perform Back, Home, Recents and Lock-screen actions on your behalf. No screen content is read or stored.</string>
 
     <string name="bubble_settings">Assistive bubble</string>
-    <string name="bubble_manage_hidden">Hidden apps</string>
-    <string name="bubble_start">Start bubble</string>
-    <string name="bubble_stop">Stop bubble</string>
     <string name="bubble_pick_apps">Pick apps for the ring</string>
-    <string name="bubble_add_apps">Add apps</string>
-    <string name="bubble_no_apps">No apps pinned yet</string>
-    <string name="bubble_remove">Remove from ring</string>
     <string name="bubble_need_overlay">Grant “Display over other apps” first</string>
     <string name="bubble_need_accessibility">Enable the Assistive bubble accessibility service for Back / Home / Lock</string>
     <string name="bubble_saved">Ring updated</string>
@@ -299,13 +285,7 @@
     <string name="qs_torch">Torch</string>
     <string name="qs_volume">Volume</string>
     <string name="qs_break">Break</string>
-    <string name="qs_sound">Sound</string>
-    <string name="qs_brightness">Brightness</string>
-    <string name="qs_focus">Focus mode</string>
     <string name="qs_dnd">Do Not Disturb</string>
-    <string name="qs_bedtime">Bedtime mode</string>
-    <string name="qs_tea">Tea mode (5 min break)</string>
-    <string name="qs_unavailable">Not available on this device</string>
 
     <!-- Tea mode -->
     <string name="tea_mode_title">Tea mode</string>

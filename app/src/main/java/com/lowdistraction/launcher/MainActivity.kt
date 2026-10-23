@@ -41,7 +41,6 @@ import com.lowdistraction.launcher.bubble.AssistiveTouchService
 import com.lowdistraction.launcher.bubble.BubblePrefs
 import kotlin.math.abs
 import kotlin.math.cos
-import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /**
