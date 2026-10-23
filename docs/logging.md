@@ -82,7 +82,9 @@ there is no identifier to hash — and none is invented to fill the gap.
 **Preferences and screens** — `settings_changed`, `bubble_toggled`,
 `diagnostics_action`, `guide_step`, `guide_finished`, `tea_mode`
 
-**Health** — `performance_marker`, `error_state_shown`, `crash`, `anr`
+**Health** — `performance_marker`, `error_state_shown`, `crash`, `previous_run_crashed`, `anr`
+
+**Adoption** — `wheel_opened`
 
 **Background** — `file_index_rebuild`
 
@@ -102,7 +104,7 @@ local, offline Android launcher — including the ones that cannot exist here.
 | # | Category | Here |
 | --- | --- | --- |
 | 1 | Application | **yes** — `session_start`, screens, launches, settings |
-| 2 | Error | **yes** — `crash` (fatal), `anr`, `error_state_shown` |
+| 2 | Error | **yes** — `crash` (fatal, with the stack trace), `previous_run_crashed`, `anr`, `error_state_shown` |
 | 3 | Security | **yes** — `permission_state_resolved`, `access_fix_requested`/`_result`, `permission_loop`. No logins and no requests exist to log |
 | 4 | Performance | **yes** — `performance_marker`, `app_list_loaded`, `media_query_result`, plus memory in the report |
 | 5 | User activity | **yes** — searches, scroll depth, rage taps, dead clicks, guide steps, tea mode |
@@ -110,7 +112,7 @@ local, offline Android launcher — including the ones that cannot exist here.
 | 7 | API & network | **no** — the app has no internet permission, so it can never make a call |
 | 8 | Database | **no** — nothing is stored beyond SharedPreferences and the log file |
 | 9 | Audit | **yes** — `settings_changed` and `diagnostics_action`: who changed what, when, and which setting |
-| 10 | Analytics & business | **no** — deliberately. No trackers, no telemetry, no upload. The report's **Signals** and **Log health** sections are the local equivalent |
+| 10 | Analytics & business | **yes, locally** — the report's **Usage (local analytics)** section counts sessions, days covered, most-used screens, searches, the launch funnel and feature adoption from the events already recorded. No analytics SDK, no telemetry and no upload: the app has no internet permission |
 | 11 | Background jobs | **yes** — `file_index_rebuild`, the one real background job: a walk of storage |
 | 12 | Debug & trace | **yes** — `bubble_hidden` at `debug` level; distributed tracing does not apply to one process on one device |
 
@@ -118,6 +120,26 @@ Every event carries a `category`, the report prints a count per category, and
 the schema check in CI fails if an event's category is missing or does not match
 the schema. A category sitting at zero in the report is honest: it says the
 category applies and simply has not happened yet.
+
+### Crash reporting without a service
+
+There is no Sentry, no Crashlytics and no Firebase, because all of them upload
+and this app cannot reach the network. What it does instead:
+
+- The uncaught-exception handler writes the **full stack trace** (redacted, capped
+  at 4000 characters) together with the exception type, the screen, the last
+action, the thread, whether it was the main thread, and how long the process had
+  been alive.
+- A `fatal` record is written **synchronously**, on the crashing thread. Every
+  other event goes to a background writer, but the writer's queue would die with
+  the process — so the one record that matters most is the one exception to that
+  rule.
+- On the next start, if the last thing in the log is a crash, that is recorded as
+  `previous_run_crashed`. It is the only way a crash loop can become visible from
+  inside the app.
+- The report has a **Crash reports** section with the last three crashes and the
+  first frames of each trace. The whole trace is in the `.json` and `.csv`
+  exports.
 
 ### Not applicable here
 
@@ -127,6 +149,11 @@ category applies and simply has not happened yet.
 declared in the schema as **not applicable**, each with the reason. The first is
 the interesting one: this app cannot make a network call, so it can never log
 one.
+
+The analytics row is the one that moved. It used to read *no*; it now reads
+*yes, locally*, because the honest answer was never that the app has no idea how
+it is used — it was that the app has no way to send that anywhere. A local view
+over the log answers the question without breaking the promise.
 
 ## Privacy
 

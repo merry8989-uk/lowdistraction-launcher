@@ -137,9 +137,18 @@ on. No ads, no upsell, no Pro version.
 
 ## Privacy
 
-**There are no trackers, no analytics, no crash reporting, no ads, no accounts
-and no Pro features.** There is nowhere for data to go, so nothing is collected
-in the first place.
+**There is no analytics SDK, no telemetry service, no crash-reporting service,
+no trackers, no ads, no accounts and no Pro features.** There is nowhere for
+data to go, so nothing is sent anywhere in the first place.
+
+That is worth being exact about, because the app does keep a **local
+diagnostics log** — described below — and a log is only useful if it is
+complete. What it records stays on the phone: the app has no internet
+permission, so nothing can leave except through the export, share or mail
+buttons you press yourself. It includes a **Crash reports** section with the
+stack trace, and a **Usage (local analytics)** section that counts sessions,
+screens, searches and feature use from the events already in the log. Both are
+views over the local file. Neither is a service, and neither uploads.
 
 The app **cannot reach the network**. The source manifest declares
 `android.permission.INTERNET` with `tools:node="remove"`, which strips it out
@@ -308,8 +317,9 @@ absolute lock (hold the hint for 3 s to end it early).
 ## Contact
 
 Settings has a plain **Ask for more features** link to `@osintgram_io` on
-Instagram. It is an ordinary web link — the app itself ships with no analytics,
-no crash reporting and no trackers of any kind.
+Instagram. It is an ordinary web link — the app itself ships with no analytics
+SDK, no crash-reporting service and no trackers of any kind, and it keeps its
+diagnostics log only on the phone.
 
 ## Signing
 
@@ -370,7 +380,9 @@ Two house rules the project will not bend on:
 
 1. **No internet permission, ever.** The `checkNoInternet` build guard enforces
    it.
-2. **No trackers, analytics, telemetry, ads or paid tiers.**
+2. **No trackers, no analytics or crash-reporting service, no telemetry, no ads
+   and no paid tiers.** Diagnostics are a local file with an on/off switch, and
+   they leave the phone only when you send them.
 
 ## Licence
 

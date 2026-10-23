@@ -331,17 +331,42 @@ object Events {
         c: Context,
         exceptionType: String,
         stackHash: String,
+        stackTrace: String,
         lastScreen: String,
         lastAction: String,
-        thread: String
+        thread: String,
+        mainThread: Boolean,
+        uptimeMs: Long
     ) = log(
         c, "crash", "fatal", Category.ERROR.value,
         "fatal" to true,
         "exception_type" to exceptionType,
         "stack_trace_hash" to stackHash,
+        // The trace itself, not only a hash of it: a hash says two crashes match,
+        // it does not say where. Redacted and capped by Diag.
+        "stack_trace" to stackTrace,
         "last_screen" to lastScreen,
         "last_action" to lastAction,
-        "thread" to thread
+        "thread" to thread,
+        "main_thread" to mainThread,
+        "uptime_ms" to uptimeMs
+    )
+
+    // --------------------------------------------------------- crash reporting
+    /**
+     * A crash from the previous run, recorded once the app is up again — the only
+     * way a crash loop becomes visible from inside the app.
+     */
+    fun previousRunCrashed(
+        c: Context,
+        exceptionType: String,
+        lastScreen: String,
+        occurredAt: String
+    ) = log(
+        c, "previous_run_crashed", "warn", Category.ERROR.value,
+        "exception_type" to exceptionType,
+        "last_screen" to lastScreen,
+        "occurred_at" to occurredAt
     )
 
     fun anr(c: Context, durationMs: Long, screen: String) =
@@ -388,7 +413,11 @@ object Events {
         "trigger" to trigger
     )
 
-    // ----------------------------------------------------------------- debug
+    // ------------------------------------------------------------------ debug
     fun bubbleHidden(c: Context, reason: String) =
         log(c, "bubble_hidden", "debug", Category.DEBUG.value, "reason" to reason)
+
+    // ------------------------------------------------------------- adoption
+    fun wheelOpened(c: Context, appCount: Int) =
+        log(c, "wheel_opened", "info", Category.ACTIVITY.value, "app_count" to appCount)
 }

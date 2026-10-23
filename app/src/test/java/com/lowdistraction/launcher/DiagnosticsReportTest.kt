@@ -1,9 +1,12 @@
 package com.lowdistraction.launcher
 
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import java.io.ByteArrayInputStream
+import java.util.TimeZone
 import java.util.zip.ZipInputStream
 
 /**
@@ -15,6 +18,23 @@ import java.util.zip.ZipInputStream
 class DiagnosticsReportTest {
 
     private val when0 = 1_700_000_000_000L
+
+    private var was: TimeZone? = null
+
+    /**
+     * The human-readable stamps are local time. Pinning UTC keeps the assertions
+     * the same wherever the tests happen to run.
+     */
+    @Before
+    fun pinTimeZone() {
+        was = TimeZone.getDefault()
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+    }
+
+    @After
+    fun restoreTimeZone() {
+        was?.let { TimeZone.setDefault(it) }
+    }
 
     private fun event(
         name: String,
@@ -34,14 +54,14 @@ class DiagnosticsReportTest {
     private fun report(vararg events: Diag.Event) = DiagnosticsReport.Report(
         generatedAt = when0,
         appName = "Low Distraction",
-        version = "1.36",
-        versionCode = 37L,
+        version = "1.37",
+        versionCode = 38L,
         enabled = true,
-        schemaVersion = "1.1.0",
+        schemaVersion = "1.2.0",
         sections = listOf(
             DiagnosticsReport.Section(
                 "App",
-                listOf(DiagnosticsReport.Row("Version", "1.36 (37)"))
+                listOf(DiagnosticsReport.Row("Version", "1.37 (38)"))
             )
         ),
         events = events.toList(),
@@ -53,14 +73,14 @@ class DiagnosticsReportTest {
         DiagnosticsReport.Report(
             generatedAt = when0,
             appName = "Low Distraction",
-            version = "1.36",
-            versionCode = 37L,
+            version = "1.37",
+            versionCode = 38L,
             enabled = true,
-            schemaVersion = "1.1.0",
+            schemaVersion = "1.2.0",
             sections = listOf(
                 DiagnosticsReport.Section(
                     "App",
-                    listOf(DiagnosticsReport.Row("Version", "1.36 (37)"))
+                    listOf(DiagnosticsReport.Row("Version", "1.37 (38)"))
                 )
             ),
             events = events.toList(),
@@ -109,7 +129,7 @@ class DiagnosticsReportTest {
         val json = DiagnosticsReport.renderJson(
             report(event("bubble_hidden", mapOf("reason" to "sensitive_app")))
         )
-        assertTrue(json.contains("\"schemaVersion\": \"1.1.0\""))
+        assertTrue(json.contains("\"schemaVersion\": \"1.2.0\""))
         assertTrue(json.contains("\"internetPermission\": false"))
         assertTrue(json.contains("\"title\": \"App\""))
         assertTrue(json.contains("bubble_hidden"))
@@ -238,6 +258,119 @@ class DiagnosticsReportTest {
         assertTrue(byKey["App launch unmatched"]!!.startsWith("0"))
     }
 
+    // ----------------------------------------------------------- crash reports
+
+    @Test
+    fun `a log with no crashes says so plainly`() {
+        val rows = DiagnosticsReport.crashRows(listOf(event("screen_view")))
+        val byKey = rows.associate { it.key to it.value }
+        assertEquals("0", byKey["Crashes in log"])
+        assertEquals("none recorded", byKey["Report"])
+    }
+
+    @Test
+    fun `a crash is reported with the context needed to act on it`() {
+        val rows = DiagnosticsReport.crashRows(
+            listOf(
+                event(
+                    "crash",
+                    mapOf(
+                        "exception_type" to "java.lang.NullPointerException",
+                        "stack_trace" to "java.lang.NullPointerException: boom\nat a.B.c(B.kt:42)",
+                        "last_screen" to "Settings",
+                        "last_action" to "opened com.example.app",
+                        "thread" to "main",
+                        "main_thread" to "true",
+                        "uptime_ms" to "41200"
+                    ),
+                    category = "error",
+                    level = "fatal"
+                )
+            )
+        )
+        val byKey = rows.associate { it.key to it.value }
+        assertEquals("1", byKey["Crashes in log"])
+        assertEquals("java.lang.NullPointerException", byKey["2023-11-14 22:13:20.000"])
+        assertEquals("Settings", byKey["  screen"])
+        assertEquals("opened com.example.app", byKey["  last action"])
+        assertEquals("main (main)", byKey["  thread"])
+        assertEquals("41200 ms", byKey["  uptime"])
+        assertTrue(byKey["  trace"]!!.contains("a.B.c(B.kt:42)"))
+    }
+
+    @Test
+    fun `a long trace is summarised and points at the export`() {
+        val trace = (1..20).joinToString("\n") { "at frame.Number$it(F.kt:$it)" }
+        val rows = DiagnosticsReport.crashRows(
+            listOf(event("crash", mapOf("stack_trace" to trace), level = "fatal"))
+        )
+        val head = rows.first { it.key == "  trace" }.value
+        assertTrue(head.contains("frame.Number1"))
+        assertTrue(head.contains("full trace in the export"))
+    }
+
+    @Test
+    fun `a crash with no trace still reports rather than crashing the report`() {
+        val rows = DiagnosticsReport.crashRows(listOf(event("crash", level = "fatal")))
+        val byKey = rows.associate { it.key to it.value }
+        assertEquals("—", byKey["  trace"])
+        assertEquals("unknown", byKey.values.first())
+    }
+
+    @Test
+    fun `a crash loop is counted`() {
+        val rows = DiagnosticsReport.crashRows(
+            listOf(
+                event("crash", level = "fatal"),
+                event("previous_run_crashed", mapOf("exception_type" to "java.lang.IllegalStateException"))
+            )
+        )
+        val byKey = rows.associate { it.key to it.value }
+        assertEquals("1", byKey["Crash loops seen"])
+    }
+
+    // ---------------------------------------------------------- local analytics
+
+    @Test
+    fun `the usage view counts what the log already holds`() {
+        val rows = DiagnosticsReport.usageRows(
+            listOf(
+                event("session_start"),
+                event("screen_view", mapOf("screen_name" to "Home")),
+                event("screen_view", mapOf("screen_name" to "Home")),
+                event("screen_view", mapOf("screen_name" to "Settings")),
+                event("search_performed", mapOf("query_length" to "3")),
+                event("search_no_results", mapOf("query_length" to "9")),
+                event("wheel_opened", mapOf("app_count" to "4")),
+                event("tea_mode", mapOf("action" to "start")),
+                event("media_query_result", mapOf("item_count" to "2")),
+                event("app_launch_result", mapOf("outcome" to "success")),
+                event("app_launch_result", mapOf("outcome" to "cancelled")),
+                event("diagnostics_action", mapOf("action" to "refresh")),
+                event("diagnostics_action", mapOf("action" to "export"))
+            )
+        )
+        val byKey = rows.associate { it.key to it.value }
+        assertEquals("13", byKey["Events in log"])
+        assertEquals("1", byKey["Sessions"])
+        assertEquals("1  (2023-11-14 → 2023-11-14)", byKey["Days covered"])
+        assertEquals("Home ×2, Settings ×1", byKey["Most used screens"])
+        assertEquals("1  (1 with no result)", byKey["Searches"])
+        assertEquals("1", byKey["Apps opened"])
+        assertEquals("1", byKey["Stopped at the pause"])
+        assertEquals("1", byKey["Wheel opened"])
+        assertEquals("1", byKey["Tea breaks taken"])
+        // A refresh is not an export, so only the one counts.
+        assertEquals("1", byKey["Reports exported"])
+    }
+
+    @Test
+    fun `the usage view on an empty log says so rather than guessing`() {
+        val rows = DiagnosticsReport.usageRows(emptyList())
+        assertEquals(1, rows.size)
+        assertEquals("nothing recorded yet", rows[0].value)
+    }
+
     // ----------------------------------------------------------------- signals
 
     @Test
@@ -287,7 +420,7 @@ class DiagnosticsReportTest {
     @Test
     fun `a text report names the version and says when nothing was recorded`() {
         val text = DiagnosticsReport.renderText(report())
-        assertTrue(text.contains("1.36"))
+        assertTrue(text.contains("1.37"))
         assertTrue(text.contains("nothing recorded yet"))
     }
 }

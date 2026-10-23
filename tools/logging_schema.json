@@ -1,7 +1,7 @@
 {
-  "schema_version": "1.1.0",
+  "schema_version": "1.2.0",
   "title": "Low Distraction — diagnostics event schema",
-  "description": "One structured schema for every event the launcher records. Modelled on the shared ProGallery logging standard so app and web data can be joined. Bump schema_version on any breaking change. Version 1.1.0 adds the six severity levels (trace/debug/info/warn/error/fatal), a category on every event, and app_id in the envelope.",
+  "description": "One structured schema for every event the launcher records. Modelled on the shared ProGallery logging standard so app and web data can be joined. Bump schema_version on any breaking change. Version 1.1.0 adds the six severity levels (trace/debug/info/warn/error/fatal), a category on every event, and app_id in the envelope. Version 1.2.0 keeps the full stack trace on a crash, records a crash that survived a restart, and treats the local analytics view as a category this app does produce — without any upload.",
   "envelope": {
     "required": [
       "event_name",
@@ -23,7 +23,7 @@
       "release_channel"
     ],
     "omitted": {
-      "user_id": "The app has no accounts and no sign-in, so there is no identifier to hash. Nothing is sent in its place.",
+      "user_id": "Omitted: the app has no accounts and no identifiers, so there is nothing to hash. A local analytics view needs no user id to count sessions and screens.",
       "request_id": "There are no requests to correlate: the app makes no network calls. attempt_id links one user action to its outcome instead.",
       "environment": "release_channel carries the same meaning (production / beta) and is already present."
     }
@@ -362,16 +362,19 @@
     },
     "crash": {
       "level": "fatal",
-      "when": "An uncaught exception",
+      "when": "The process is about to die from an uncaught exception",
       "required": [
         "fatal",
         "exception_type"
       ],
       "optional": [
         "stack_trace_hash",
+        "stack_trace",
         "last_screen",
         "last_action",
-        "thread"
+        "thread",
+        "main_thread",
+        "uptime_ms"
       ],
       "category": "error"
     },
@@ -469,6 +472,27 @@
         "reason"
       ],
       "optional": []
+    },
+    "previous_run_crashed": {
+      "category": "error",
+      "level": "warn",
+      "when": "The previous run ended in a crash and the app has started again",
+      "required": [
+        "exception_type"
+      ],
+      "optional": [
+        "last_screen",
+        "occurred_at"
+      ]
+    },
+    "wheel_opened": {
+      "category": "activity",
+      "level": "info",
+      "when": "The assistive wheel is opened",
+      "required": [
+        "app_count"
+      ],
+      "optional": []
     }
   },
   "not_applicable": {
@@ -489,7 +513,7 @@
     "infrastructure": "No servers, no deployment, no services to monitor.",
     "distributed_tracing": "One process on one device; there is no request to trace across services.",
     "login": "No accounts and no sign-in, so there are no login attempts to log.",
-    "analytics": "Analytics are deliberately absent: no trackers, no telemetry, no upload. The Signals and Log health sections of the report are the local equivalent."
+    "analytics": "No analytics SDK, no telemetry and no upload — the app has no internet permission. What there is instead is a local view over this log: the report's 'Usage (local analytics)' section counts sessions, screens, searches and feature adoption from the events already recorded."
   },
   "privacy": {
     "never_logged": [

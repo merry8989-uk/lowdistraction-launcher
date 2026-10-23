@@ -46,12 +46,15 @@ object LogFormat {
     /**
      * The same rules the web side uses: no email address, no long digit run and
      * no filesystem path survives, and the whole value is capped.
+     *
+     * The cap is a parameter because one value — a crash stack trace — is worth
+     * far more room than an ordinary property.
      */
-    fun redact(value: String): String {
+    fun redact(value: String, cap: Int = VALUE_CAP): String {
         var s = emailPattern.replace(value, "[email]")
         s = digitRun.replace(s, "[number]")
         s = pathPattern.replace(s, "[path]")
-        return if (s.length > VALUE_CAP) s.substring(0, VALUE_CAP) + "…" else s
+        return if (s.length > cap) s.substring(0, cap) + "…" else s
     }
 
     /** One JSON string literal, with everything JSON requires escaped. */

@@ -1,0 +1,22 @@
+Crash reports and a local usage view — still without sending anything anywhere
+
+- A crash now keeps the whole stack trace, not only a hash of it, together with
+  the exception type, the screen you were on, the last thing the app did, the
+  thread, whether it was the main thread, and how long the process had been
+  alive. The report gains a Crash reports section showing the last three.
+- A fatal record is written immediately, on the crashing thread. Every other
+  event goes to a background writer, but that queue would die with the process —
+  so the one record that matters most is the exception.
+- If the previous run ended in a crash, the next start records it. That is the
+  only way a crash loop can show up from inside the app.
+- The report gains a Usage (local analytics) section: sessions, days covered,
+  most used screens, searches and how many came back empty, the launch funnel,
+  and which features are actually used — the wheel, tea mode, file search, the
+  guide, the diagnostics exports.
+- To answer that last question honestly, the wheel now records that it was
+  opened, along with how many apps are on it. It was the one feature with no
+  event of its own.
+- Nothing here is an analytics or crash-reporting service. There is no Sentry,
+  no Crashlytics and no Firebase, because all of them upload and this app cannot
+  reach the network. Both sections are views over the local file, which leaves
+  the phone only when you export, share or mail it.

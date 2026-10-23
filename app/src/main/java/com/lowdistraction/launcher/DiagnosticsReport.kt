@@ -63,6 +63,8 @@ object DiagnosticsReport {
         sections.add(Section("Performance", performanceRows(context, events)))
         sections.add(Section("Signals", signalRows(events)))
         sections.add(Section("Log health", healthRows(events)))
+        sections.add(Section("Crash reports", crashRows(events)))
+        sections.add(Section("Usage (local analytics)", usageRows(events)))
         sections.add(Section("Privacy", privacyRows()))
         return Report(
             generatedAt = System.currentTimeMillis(),
@@ -222,6 +224,107 @@ object DiagnosticsReport {
         out.add(Row("Event types seen", events.map { it.name }.toSet().size.toString()))
         return out
     }
+
+    /**
+     * One entry per crash, with the trace.
+     *
+     * This is the only crash reporting this app can do, so it has to be a good
+     * one: there is no service to send anything to, which means the whole of the
+     * report has to be here, in front of the user, where they can send it
+     * themselves if they want to.
+     */
+    internal fun crashRows(events: List<Diag.Event>): List<Row> = buildList {
+        val crashes = events.filter { it.name == "crash" }
+        add(Row("Crashes in log", crashes.size.toString()))
+        add(Row("Crash loops seen", events.count { it.name == "previous_run_crashed" }.toString()))
+        if (crashes.isEmpty()) {
+            add(Row("Report", "none recorded"))
+            return@buildList
+        }
+        for (crash in crashes.takeLast(CRASHES_SHOWN)) {
+            add(Row(LogFormat.stamp(crash.time), crash.props["exception_type"] ?: "unknown"))
+            add(Row("  screen", crash.props["last_screen"] ?: "—"))
+            add(Row("  last action", crash.props["last_action"] ?: "—"))
+            add(
+                Row(
+                    "  thread",
+                    (crash.props["thread"] ?: "—") +
+                        if (crash.props["main_thread"] == "true") " (main)" else ""
+                )
+            )
+            add(Row("  uptime", (crash.props["uptime_ms"] ?: "0") + " ms"))
+            add(Row("  trace", traceHead(crash.props["stack_trace"])))
+        }
+        if (crashes.size > CRASHES_SHOWN) {
+            add(Row("Older crashes", (crashes.size - CRASHES_SHOWN).toString() + " more, in the export"))
+        }
+    }
+
+    /**
+     * The trace's first few frames on one line, so a table row survives. The whole
+     * of it is in the .json and .csv exports, and in the log itself.
+     */
+    private fun traceHead(trace: String?): String {
+        if (trace.isNullOrBlank()) return "—"
+        val lines = trace.lines().filter { it.isNotBlank() }
+        return lines.take(TRACE_LINES).joinToString(" | ") +
+            if (lines.size > TRACE_LINES) " | … full trace in the export" else ""
+    }
+
+    /**
+     * The local analytics view: what the events already say about how the app is
+     * used. Nothing extra is collected and nothing is uploaded — this only counts
+     * what is in the log, and it is the only kind of analytics this app can have.
+     */
+    internal fun usageRows(events: List<Diag.Event>): List<Row> = buildList {
+        if (events.isEmpty()) {
+            add(Row("Usage", "nothing recorded yet"))
+            return@buildList
+        }
+        val days = events.map { LogFormat.stamp(it.time).take(10) }.toSortedSet()
+        add(Row("Events in log", events.size.toString()))
+        add(Row("Sessions", events.count { it.name == "session_start" }.toString()))
+        add(
+            Row(
+                "Days covered",
+                days.size.toString() + "  (" + days.first() + " → " + days.last() + ")"
+            )
+        )
+
+        val screens = events.filter { it.name == "screen_view" }
+            .groupingBy { it.props["screen_name"] ?: "—" }
+            .eachCount()
+            .entries.sortedByDescending { it.value }
+            .take(SCREENS_SHOWN)
+        add(
+            Row(
+                "Most used screens",
+                screens.joinToString(", ") { it.key + " ×" + it.value }.ifEmpty { "—" }
+            )
+        )
+
+        val searches = events.count { it.name == "search_performed" }
+        val empty = events.count { it.name == "search_no_results" }
+        add(Row("Searches", searches.toString() + "  (" + empty + " with no result)"))
+        add(Row("Apps opened", countOutcome(events, "success").toString()))
+        add(Row("Stopped at the pause", countOutcome(events, "cancelled").toString()))
+        add(Row("Wheel opened", events.count { it.name == "wheel_opened" }.toString()))
+        add(Row("Tea breaks taken", events.count { it.name == "tea_mode" }.toString()))
+        add(Row("File searches", events.count { it.name == "media_query_result" }.toString()))
+        add(Row("Guide steps seen", events.count { it.name == "guide_step" }.toString()))
+        add(Row("Settings changed", events.count { it.name == "settings_changed" }.toString()))
+        add(
+            Row(
+                "Reports exported",
+                events.count {
+                    it.name == "diagnostics_action" && it.props["action"] != "refresh"
+                }.toString()
+            )
+        )
+    }
+
+    private fun countOutcome(events: List<Diag.Event>, outcome: String): Int =
+        events.count { it.name == "app_launch_result" && it.props["outcome"] == outcome }
 
     /**
      * The categories the shared standard lists, with what this app collected for
@@ -496,6 +599,11 @@ object DiagnosticsReport {
 
     private fun isoLocal(time: Long): String =
         SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ", Locale.US).format(Date(time))
+
+    /** How many crashes, trace frames and screens the report spells out. */
+    private const val CRASHES_SHOWN = 3
+    private const val TRACE_LINES = 6
+    private const val SCREENS_SHOWN = 5
 
     /** The categories this app can produce, in the order the report lists them. */
     private val CATEGORIES = listOf(

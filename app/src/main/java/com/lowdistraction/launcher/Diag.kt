@@ -62,6 +62,11 @@ object Diag {
     /** Lines allowed to be waiting for the disk before new ones are dropped. */
     private const val MAX_QUEUE = 500
 
+    /** A stack trace is worth far more room than an ordinary property. */
+    private const val TRACE_CAP = 4000
+
+    private const val LEVEL_FATAL = "fatal"
+
     /** High-volume events only. Anything an error, or part of an intent→outcome
      *  pair, is never sampled. */
     private val SAMPLED =
@@ -171,9 +176,16 @@ object Diag {
         }
         // Pruning reads (and may rewrite) the whole file, so it belongs on the
         // writer thread — the session_start line is queued behind it, in order.
+        // The same pass looks for a crash at the very end of the log, which is
+        // the only way a crash loop can show up from inside the app.
         if (first) {
             val ctx = c.applicationContext
-            runCatching { writer.execute { prune(ctx) } }
+            runCatching {
+                writer.execute {
+                    prune(ctx)
+                    reportPreviousCrash(ctx)
+                }
+            }
         }
         if (first) {
             Events.sessionStart(c, Events.StartType.COLD, coldMs, 0L)
@@ -238,6 +250,13 @@ object Diag {
             return
         }
         val line = runCatching { line(c, name, level, category, props) }.getOrNull() ?: return
+        if (level == LEVEL_FATAL) {
+            // A fatal event is the last thing this process may ever write. The
+            // queue would die with the process, so write it now, on this thread —
+            // the one place blocking is the right answer.
+            append(c.applicationContext, line)
+            return
+        }
         enqueue(c, line)
     }
 
@@ -273,7 +292,11 @@ object Diag {
                 is Boolean -> o.put(k, v)
                 is Double -> o.put(k, v)
                 is Float -> o.put(k, v.toDouble())
-                else -> o.put(k, LogFormat.redact(v.toString()))
+                else -> {
+                    val cap =
+                        if (k == "stack_trace") TRACE_CAP else LogFormat.VALUE_CAP
+                    o.put(k, LogFormat.redact(v.toString(), cap))
+                }
             }
         }
         return o.toString()
@@ -295,6 +318,27 @@ object Diag {
             }
         }.onFailure { queued.decrementAndGet() }
     }
+
+    /**
+     * If the last thing the log holds is a crash, the previous run died from it.
+     * Recording that on the next start is what turns a crash loop into something
+     * the report can show.
+     */
+    private fun reportPreviousCrash(c: Context) {
+        val last = tail(c).lastOrNull() ?: return
+        val o = runCatching { JSONObject(last) }.getOrNull() ?: return
+        if (o.optString("event_name") != "crash") return
+        Events.previousRunCrashed(
+            c,
+            o.optString("exception_type", "unknown"),
+            o.optString("screen_or_route", "—"),
+            o.optString("timestamp", "")
+        )
+    }
+
+    /** How long the process had been alive, for a crash or an anr. */
+    private fun processUptimeMs(): Long =
+        if (processStartedAt == 0L) 0L else System.currentTimeMillis() - processStartedAt
 
     /** Runs on the writer thread only. */
     private fun append(c: Context, line: String) {
@@ -450,13 +494,20 @@ object Diag {
                 runCatching {
                     val sw = StringWriter()
                     throwable.printStackTrace(PrintWriter(sw))
+                    val trace = sw.toString()
+                    val onMain = runCatching {
+                        Looper.getMainLooper()?.thread === thread
+                    }.getOrDefault(false)
                     Events.crash(
                         ctx,
                         throwable.javaClass.name,
-                        hash(sw.toString()),
+                        hash(trace),
+                        trace,
                         currentScreen,
                         lastAction,
-                        thread.name
+                        thread.name,
+                        onMain,
+                        processUptimeMs()
                     )
                 }
             }

@@ -201,13 +201,17 @@ class FloatingBubbleService : Service() {
             return
         }
         val (sw, sh) = screenSize()
+        val pinned = loadPinnedApps()
+        // The wheel is the one feature with no event of its own, and whether it is
+        // used at all is exactly the kind of adoption question worth answering.
+        Events.wheelOpened(this, pinned.size)
         val menu = RadialMenuView(
             context = this,
             screenW = sw,
             screenH = sh,
             anchorX = (bubbleParams?.x ?: 0) + dp(28),
             anchorY = (bubbleParams?.y ?: 0) + dp(28),
-            apps = loadPinnedApps(),
+            apps = pinned,
             onApp = { launchFromWheel(it); removeOverlay() },
             onRemoveApp = { prefs.remove(it.component.flattenToString()); rebuildMenu() },
             onAddApps = { openAppPicker() },
