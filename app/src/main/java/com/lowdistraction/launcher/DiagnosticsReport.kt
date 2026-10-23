@@ -53,6 +53,11 @@ object DiagnosticsReport {
 
     // ------------------------------------------------------------- collecting
     fun collect(context: Context): Report {
+        // Let the writer catch up first, so the report includes the events of the
+        // last few milliseconds — including the one that says a report is being
+        // built. Without this the freshest records are the ones most likely to be
+        // missing.
+        Diag.flush()
         val events = Diag.entries(context)
         val sections = ArrayList<Section>()
         sections.add(Section("App", appRows(context)))
@@ -514,16 +519,45 @@ object DiagnosticsReport {
         return sb.toString()
     }
 
-    /** One parsed event as a JSON object, for when the stored lines are absent. */
+    /**
+     * One parsed event as a JSON object, for when the stored lines are absent.
+     * Nested the same way the stored ones are, so the two cannot describe the
+     * same event differently.
+     */
     private fun eventJson(e: Diag.Event): String {
+        val context = ArrayList<String>()
+        context.add("\"screen\": " + json(e.screen))
+        context.add("\"operation\": " + json(e.name))
+        val metrics = ArrayList<String>()
+        val error = ArrayList<String>()
+        val attributes = ArrayList<String>()
+        for ((k, v) in e.props) {
+            val pair = json(k) + ": " + json(v)
+            when (LogGroups.of(k)) {
+                LogGroups.CONTEXT -> context.add(pair)
+                LogGroups.METRICS -> metrics.add(pair)
+                LogGroups.ERROR -> error.add(pair)
+                else -> attributes.add(pair)
+            }
+        }
         val sb = StringBuilder("{")
-        sb.append("\"event_name\": ").append(json(e.name))
+        sb.append("\"schema_version\": ").append(json(Diag.SCHEMA_VERSION))
         sb.append(", \"timestamp\": ").append(json(LogFormat.isoUtc(e.time)))
-        sb.append(", \"log_level\": ").append(json(e.level))
+        sb.append(", \"severity\": ").append(json(e.level))
         sb.append(", \"category\": ").append(json(e.category))
-        sb.append(", \"screen_or_route\": ").append(json(e.screen))
-        sb.append(", \"session_id\": ").append(json(e.session))
-        for ((k, v) in e.props) sb.append(", ").append(json(k)).append(": ").append(json(v))
+        sb.append(", \"event_name\": ").append(json(e.name))
+        sb.append(", \"context\": { ").append(context.joinToString(", ")).append(" }")
+        sb.append(", \"correlation\": { \"session_id\": ").append(json(e.session))
+            .append(" }")
+        if (metrics.isNotEmpty()) {
+            sb.append(", \"metrics\": { ").append(metrics.joinToString(", ")).append(" }")
+        }
+        if (error.isNotEmpty()) {
+            sb.append(", \"error\": { ").append(error.joinToString(", ")).append(" }")
+        }
+        if (attributes.isNotEmpty()) {
+            sb.append(", \"attributes\": { ").append(attributes.joinToString(", ")).append(" }")
+        }
         return sb.append("}").toString()
     }
 
@@ -560,7 +594,7 @@ object DiagnosticsReport {
     fun renderCsv(r: Report): String {
         val columns = ArrayList<String>()
         for (k in listOf(
-            "timestamp", "log_level", "category", "event_name", "session_id", "screen_or_route"
+            "timestamp", "severity", "category", "event_name", "session_id", "screen"
         )) {
             columns.add(k)
         }

@@ -40,7 +40,7 @@ class DiagnosticsReportTest {
         name: String,
         props: Map<String, String> = emptyMap(),
         category: String = "activity",
-        level: String = "info"
+        level: String = "INFO"
     ) = Diag.Event(
         name = name,
         time = when0,
@@ -57,7 +57,7 @@ class DiagnosticsReportTest {
         version = "1.37",
         versionCode = 38L,
         enabled = true,
-        schemaVersion = "1.2.0",
+        schemaVersion = "2.0.0",
         sections = listOf(
             DiagnosticsReport.Section(
                 "App",
@@ -76,7 +76,7 @@ class DiagnosticsReportTest {
             version = "1.37",
             versionCode = 38L,
             enabled = true,
-            schemaVersion = "1.2.0",
+            schemaVersion = "2.0.0",
             sections = listOf(
                 DiagnosticsReport.Section(
                     "App",
@@ -100,7 +100,7 @@ class DiagnosticsReportTest {
         val lines = csv.trim().split("\n")
         val header = lines[0].split(",")
         assertEquals("timestamp", header[0].trim('"'))
-        assertEquals("log_level", header[1].trim('"'))
+        assertEquals("severity", header[1].trim('"'))
         assertEquals("category", header[2].trim('"'))
         assertEquals("event_name", header[3].trim('"'))
         assertTrue(header.contains("\"package\""))
@@ -129,7 +129,7 @@ class DiagnosticsReportTest {
         val json = DiagnosticsReport.renderJson(
             report(event("bubble_hidden", mapOf("reason" to "sensitive_app")))
         )
-        assertTrue(json.contains("\"schemaVersion\": \"1.2.0\""))
+        assertTrue(json.contains("\"schema_version\": \"2.0.0\""))
         assertTrue(json.contains("\"internetPermission\": false"))
         assertTrue(json.contains("\"title\": \"App\""))
         assertTrue(json.contains("bubble_hidden"))
@@ -159,7 +159,7 @@ class DiagnosticsReportTest {
         val json = DiagnosticsReport.renderJson(report(event("screen_view")))
         assertTrue(json.contains("\"event_name\": \"screen_view\""))
         assertTrue(json.contains("\"category\": \"activity\""))
-        assertTrue(json.contains("\"screen_or_route\": \"Home\""))
+        assertTrue(json.contains("\"screen\": \"Home\""))
     }
 
     // ------------------------------------------------------------------- zip
@@ -168,7 +168,7 @@ class DiagnosticsReportTest {
     fun `the zip holds all four reports and each matches its renderer`() {
         val r = report(
             event("screen_view", mapOf("screen_name" to "Home")),
-            event("crash", mapOf("fatal" to "true"), category = "error", level = "fatal")
+            event("crash", mapOf("fatal" to "true"), category = "error", level = "FATAL")
         )
         val entries = LinkedHashMap<String, String>()
         ZipInputStream(ByteArrayInputStream(DiagnosticsReport.renderZip(r))).use { zip ->
@@ -284,7 +284,7 @@ class DiagnosticsReportTest {
                         "uptime_ms" to "41200"
                     ),
                     category = "error",
-                    level = "fatal"
+                    level = "FATAL"
                 )
             )
         )
@@ -302,7 +302,7 @@ class DiagnosticsReportTest {
     fun `a long trace is summarised and points at the export`() {
         val trace = (1..20).joinToString("\n") { "at frame.Number$it(F.kt:$it)" }
         val rows = DiagnosticsReport.crashRows(
-            listOf(event("crash", mapOf("stack_trace" to trace), level = "fatal"))
+            listOf(event("crash", mapOf("stack_trace" to trace), level = "FATAL"))
         )
         val head = rows.first { it.key == "  trace" }.value
         assertTrue(head.contains("frame.Number1"))
@@ -311,7 +311,7 @@ class DiagnosticsReportTest {
 
     @Test
     fun `a crash with no trace still reports rather than crashing the report`() {
-        val rows = DiagnosticsReport.crashRows(listOf(event("crash", level = "fatal")))
+        val rows = DiagnosticsReport.crashRows(listOf(event("crash", level = "FATAL")))
         val byKey = rows.associate { it.key to it.value }
         assertEquals("—", byKey["  trace"])
         assertEquals("—", byKey["  screen"])
@@ -324,7 +324,7 @@ class DiagnosticsReportTest {
     fun `a crash loop is counted`() {
         val rows = DiagnosticsReport.crashRows(
             listOf(
-                event("crash", level = "fatal"),
+                event("crash", level = "FATAL"),
                 event("previous_run_crashed", mapOf("exception_type" to "java.lang.IllegalStateException"))
             )
         )
@@ -413,8 +413,8 @@ class DiagnosticsReportTest {
     fun `crashes and sessions are counted from the events`() {
         val r = report(
             event("session_start"),
-            event("crash", level = "fatal"),
-            event("crash", level = "fatal")
+            event("crash", level = "FATAL"),
+            event("crash", level = "FATAL")
         )
         assertEquals(2, r.crashCount)
         assertEquals(1, r.sessions)

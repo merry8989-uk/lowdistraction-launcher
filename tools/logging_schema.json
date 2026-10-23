@@ -1,41 +1,43 @@
 {
-  "schema_version": "1.2.0",
+  "schema_version": "2.0.0",
   "title": "Low Distraction — diagnostics event schema",
-  "description": "One structured schema for every event the launcher records. Modelled on the shared ProGallery logging standard so app and web data can be joined. Bump schema_version on any breaking change. Version 1.1.0 adds the six severity levels (trace/debug/info/warn/error/fatal), a category on every event, and app_id in the envelope. Version 1.2.0 keeps the full stack trace on a crash, records a crash that survived a restart, and treats the local analytics view as a category this app does produce — without any upload.",
+  "description": "One structured schema for every event the launcher records, in the nested shape the unified diagnostics plan asks for (source / severity / category / context / correlation / error / metrics / privacy), which follows the OpenTelemetry logs data model. Version 2.0.0 is a breaking change: the flat envelope became nested, log_level became an uppercase severity, and event_id and observed_timestamp were added. Bump the version on any further breaking change.",
   "envelope": {
     "required": [
-      "event_name",
       "schema_version",
+      "event_id",
       "timestamp",
-      "session_id",
-      "platform",
-      "app_version",
-      "os",
-      "device_model",
-      "screen_or_route",
-      "log_level",
+      "observed_timestamp",
+      "source",
+      "severity",
       "category",
-      "app_id"
+      "event_name"
     ],
-    "optional": [
-      "attempt_id",
-      "network_type",
-      "release_channel"
+    "recommended": [
+      "message",
+      "context",
+      "correlation",
+      "privacy"
+    ],
+    "conditional": [
+      "error",
+      "metrics",
+      "attributes"
     ],
     "omitted": {
-      "user_id": "Omitted: the app has no accounts and no identifiers, so there is nothing to hash. A local analytics view needs no user id to count sessions and screens.",
-      "request_id": "There are no requests to correlate: the app makes no network calls. attempt_id links one user action to its outcome instead.",
-      "environment": "release_channel carries the same meaning (production / beta) and is already present."
+      "request_id": "There are no requests to correlate: the app makes no network calls. correlation.attempt_id links one user action to its outcome instead.",
+      "trace_id": "One process on one device, with no distributed tracing to join.",
+      "user_id": "Omitted: the app has no accounts and no identifiers, so there is nothing to hash. A local analytics view needs no user id to count sessions."
     }
   },
   "enums": {
     "log_level": [
-      "trace",
-      "debug",
-      "info",
-      "warn",
-      "error",
-      "fatal"
+      "TRACE",
+      "DEBUG",
+      "INFO",
+      "WARN",
+      "ERROR",
+      "FATAL"
     ],
     "platform": [
       "android"
@@ -120,7 +122,7 @@
   },
   "events": {
     "session_start": {
-      "level": "info",
+      "level": "INFO",
       "when": "App cold or warm start",
       "required": [
         "start_type"
@@ -129,10 +131,19 @@
         "cold_start_ms",
         "warm_start_ms"
       ],
-      "category": "application"
+      "category": "application",
+      "groups": {
+        "context": [
+          "start_type"
+        ],
+        "metrics": [
+          "cold_start_ms",
+          "warm_start_ms"
+        ]
+      }
     },
     "drop_off": {
-      "level": "info",
+      "level": "INFO",
       "when": "The last event before the app leaves the foreground",
       "required": [
         "last_screen",
@@ -141,10 +152,19 @@
       "optional": [
         "duration_ms"
       ],
-      "category": "activity"
+      "category": "activity",
+      "groups": {
+        "context": [
+          "last_screen",
+          "last_event"
+        ],
+        "metrics": [
+          "duration_ms"
+        ]
+      }
     },
     "screen_view": {
-      "level": "info",
+      "level": "INFO",
       "when": "A screen is shown",
       "required": [
         "screen_name",
@@ -153,10 +173,19 @@
       "optional": [
         "duration_ms"
       ],
-      "category": "activity"
+      "category": "activity",
+      "groups": {
+        "context": [
+          "screen_name",
+          "previous_screen"
+        ],
+        "metrics": [
+          "duration_ms"
+        ]
+      }
     },
     "permission_state_resolved": {
-      "level": "info",
+      "level": "INFO",
       "when": "After checking whether a feature holds its permission",
       "required": [
         "permission",
@@ -165,10 +194,19 @@
       "optional": [
         "item_count"
       ],
-      "category": "security"
+      "category": "security",
+      "groups": {
+        "context": [
+          "permission",
+          "state"
+        ],
+        "metrics": [
+          "item_count"
+        ]
+      }
     },
     "access_fix_requested": {
-      "level": "info",
+      "level": "INFO",
       "when": "The user asks for a permission to be fixed or granted",
       "required": [
         "permission",
@@ -178,10 +216,20 @@
       "optional": [
         "action_taken"
       ],
-      "category": "security"
+      "category": "security",
+      "groups": {
+        "context": [
+          "permission",
+          "state_before",
+          "action_taken"
+        ],
+        "correlation": [
+          "attempt_id"
+        ]
+      }
     },
     "access_fix_result": {
-      "level": "info",
+      "level": "INFO",
       "when": "The fix attempt finishes — the outcome half of the pair above",
       "required": [
         "attempt_id",
@@ -192,10 +240,23 @@
         "state_after",
         "error_code"
       ],
-      "category": "security"
+      "category": "security",
+      "groups": {
+        "correlation": [
+          "attempt_id"
+        ],
+        "context": [
+          "outcome",
+          "action_taken",
+          "state_after"
+        ],
+        "error": [
+          "error_code"
+        ]
+      }
     },
     "media_query_result": {
-      "level": "info",
+      "level": "INFO",
       "when": "After walking storage for a file search",
       "required": [
         "source",
@@ -205,10 +266,20 @@
       "optional": [
         "folders_visible"
       ],
-      "category": "performance"
+      "category": "performance",
+      "groups": {
+        "context": [
+          "source"
+        ],
+        "metrics": [
+          "item_count",
+          "query_ms",
+          "folders_visible"
+        ]
+      }
     },
     "app_list_loaded": {
-      "level": "info",
+      "level": "INFO",
       "when": "The home list has been built",
       "required": [
         "item_count",
@@ -218,10 +289,20 @@
         "hidden_count",
         "sort_mode"
       ],
-      "category": "performance"
+      "category": "performance",
+      "groups": {
+        "metrics": [
+          "item_count",
+          "query_ms",
+          "hidden_count"
+        ],
+        "context": [
+          "sort_mode"
+        ]
+      }
     },
     "app_launch_requested": {
-      "level": "info",
+      "level": "INFO",
       "when": "The user taps an app — the intent half of the launch pair",
       "required": [
         "package",
@@ -231,10 +312,20 @@
         "pause_enabled",
         "attempt_id"
       ],
-      "category": "activity"
+      "category": "activity",
+      "groups": {
+        "context": [
+          "package",
+          "source",
+          "pause_enabled"
+        ],
+        "correlation": [
+          "attempt_id"
+        ]
+      }
     },
     "app_launch_result": {
-      "level": "info",
+      "level": "INFO",
       "when": "The launch finishes: opened, cancelled at the pause, or failed",
       "required": [
         "package",
@@ -244,10 +335,22 @@
         "attempt_id",
         "waited_ms"
       ],
-      "category": "activity"
+      "category": "activity",
+      "groups": {
+        "context": [
+          "package",
+          "outcome"
+        ],
+        "correlation": [
+          "attempt_id"
+        ],
+        "metrics": [
+          "waited_ms"
+        ]
+      }
     },
     "search_performed": {
-      "level": "info",
+      "level": "INFO",
       "when": "A search runs. The query itself is never recorded",
       "required": [
         "query_length",
@@ -255,10 +358,17 @@
         "source"
       ],
       "optional": [],
-      "category": "activity"
+      "category": "activity",
+      "groups": {
+        "context": [
+          "query_length",
+          "result_count",
+          "source"
+        ]
+      }
     },
     "search_no_results": {
-      "level": "info",
+      "level": "INFO",
       "when": "A search returns nothing",
       "required": [
         "query_length",
@@ -267,10 +377,16 @@
       "optional": [
         "filters"
       ],
-      "category": "activity"
+      "category": "activity",
+      "groups": {
+        "context": [
+          "query_length",
+          "source"
+        ]
+      }
     },
     "settings_changed": {
-      "level": "info",
+      "level": "INFO",
       "when": "The user changes a setting",
       "required": [
         "setting"
@@ -278,10 +394,16 @@
       "optional": [
         "value"
       ],
-      "category": "audit"
+      "category": "audit",
+      "groups": {
+        "context": [
+          "setting",
+          "value"
+        ]
+      }
     },
     "diagnostics_action": {
-      "level": "info",
+      "level": "INFO",
       "when": "The diagnostics screen is used",
       "required": [
         "action"
@@ -293,29 +415,52 @@
         "entries",
         "value"
       ],
-      "category": "audit"
+      "category": "audit",
+      "groups": {
+        "context": [
+          "action",
+          "format",
+          "channel",
+          "value"
+        ],
+        "metrics": [
+          "bytes",
+          "entries"
+        ]
+      }
     },
     "bubble_toggled": {
-      "level": "info",
+      "level": "INFO",
       "when": "The assistive bubble is switched on or off",
       "required": [
         "enabled"
       ],
       "optional": [],
-      "category": "activity"
+      "category": "activity",
+      "groups": {
+        "context": [
+          "enabled"
+        ]
+      }
     },
     "guide_step": {
-      "level": "info",
+      "level": "INFO",
       "when": "A step of the first-run guide is shown",
       "required": [
         "step",
         "total"
       ],
       "optional": [],
-      "category": "activity"
+      "category": "activity",
+      "groups": {
+        "context": [
+          "step",
+          "total"
+        ]
+      }
     },
     "guide_finished": {
-      "level": "info",
+      "level": "INFO",
       "when": "The guide is completed or skipped",
       "required": [
         "steps_seen"
@@ -323,10 +468,16 @@
       "optional": [
         "skipped"
       ],
-      "category": "activity"
+      "category": "activity",
+      "groups": {
+        "context": [
+          "steps_seen",
+          "skipped"
+        ]
+      }
     },
     "tea_mode": {
-      "level": "info",
+      "level": "INFO",
       "when": "The five-minute break starts or ends",
       "required": [
         "action"
@@ -334,10 +485,18 @@
       "optional": [
         "duration_ms"
       ],
-      "category": "activity"
+      "category": "activity",
+      "groups": {
+        "context": [
+          "action"
+        ],
+        "metrics": [
+          "duration_ms"
+        ]
+      }
     },
     "performance_marker": {
-      "level": "info",
+      "level": "INFO",
       "when": "A key flow completes",
       "required": [
         "flow",
@@ -346,10 +505,18 @@
       "optional": [
         "frame_drops"
       ],
-      "category": "performance"
+      "category": "performance",
+      "groups": {
+        "context": [
+          "flow"
+        ],
+        "metrics": [
+          "duration_ms"
+        ]
+      }
     },
     "error_state_shown": {
-      "level": "warn",
+      "level": "WARN",
       "when": "An error message is put in front of the user",
       "required": [
         "error_code",
@@ -358,13 +525,21 @@
       "optional": [
         "message_key"
       ],
-      "category": "error"
+      "category": "error",
+      "groups": {
+        "error": [
+          "error_code"
+        ],
+        "context": [
+          "screen",
+          "message_key"
+        ]
+      }
     },
     "crash": {
-      "level": "fatal",
+      "level": "FATAL",
       "when": "The process is about to die from an uncaught exception",
       "required": [
-        "fatal",
         "exception_type"
       ],
       "optional": [
@@ -376,10 +551,26 @@
         "main_thread",
         "uptime_ms"
       ],
-      "category": "error"
+      "category": "error",
+      "groups": {
+        "error": [
+          "exception_type",
+          "stack_trace_hash",
+          "stack_trace"
+        ],
+        "context": [
+          "last_screen",
+          "last_action",
+          "thread",
+          "main_thread"
+        ],
+        "metrics": [
+          "uptime_ms"
+        ]
+      }
     },
     "anr": {
-      "level": "warn",
+      "level": "WARN",
       "when": "The main thread was blocked long enough to be felt",
       "required": [
         "duration_ms"
@@ -387,10 +578,18 @@
       "optional": [
         "last_screen"
       ],
-      "category": "error"
+      "category": "error",
+      "groups": {
+        "metrics": [
+          "duration_ms"
+        ],
+        "context": [
+          "last_screen"
+        ]
+      }
     },
     "rage_tap": {
-      "level": "warn",
+      "level": "WARN",
       "when": "Three or more taps on the same thing inside two seconds",
       "required": [
         "target",
@@ -398,29 +597,51 @@
         "window_ms"
       ],
       "optional": [],
-      "category": "activity"
+      "category": "activity",
+      "groups": {
+        "context": [
+          "target"
+        ],
+        "metrics": [
+          "taps",
+          "window_ms"
+        ]
+      }
     },
     "dead_click": {
-      "level": "info",
+      "level": "INFO",
       "when": "A tap that changed nothing at all",
       "required": [
         "target"
       ],
       "optional": [],
-      "category": "activity"
+      "category": "activity",
+      "groups": {
+        "context": [
+          "target"
+        ]
+      }
     },
     "permission_loop": {
-      "level": "warn",
+      "level": "WARN",
       "when": "The same permission fix is asked for three times in one session",
       "required": [
         "permission",
         "attempts"
       ],
       "optional": [],
-      "category": "security"
+      "category": "security",
+      "groups": {
+        "context": [
+          "permission"
+        ],
+        "metrics": [
+          "attempts"
+        ]
+      }
     },
     "back_button_spam": {
-      "level": "warn",
+      "level": "WARN",
       "when": "Three or more back presses inside two seconds",
       "required": [
         "presses",
@@ -429,31 +650,56 @@
       "optional": [
         "screen"
       ],
-      "category": "activity"
+      "category": "activity",
+      "groups": {
+        "metrics": [
+          "presses",
+          "window_ms"
+        ],
+        "context": [
+          "screen"
+        ]
+      }
     },
     "scroll_depth": {
-      "level": "info",
+      "level": "INFO",
       "when": "A scrollable list reaches a new depth",
       "required": [
         "percent",
         "screen"
       ],
       "optional": [],
-      "category": "activity"
+      "category": "activity",
+      "groups": {
+        "metrics": [
+          "percent"
+        ],
+        "context": [
+          "screen"
+        ]
+      }
     },
     "time_to_first_value": {
-      "level": "info",
+      "level": "INFO",
       "when": "From session start to the first meaningful action",
       "required": [
         "flow",
         "duration_ms"
       ],
       "optional": [],
-      "category": "performance"
+      "category": "performance",
+      "groups": {
+        "context": [
+          "flow"
+        ],
+        "metrics": [
+          "duration_ms"
+        ]
+      }
     },
     "file_index_rebuild": {
       "category": "background",
-      "level": "info",
+      "level": "INFO",
       "when": "The background walk of storage finishes (or fails)",
       "required": [
         "outcome"
@@ -462,20 +708,35 @@
         "item_count",
         "duration_ms",
         "trigger"
-      ]
+      ],
+      "groups": {
+        "context": [
+          "outcome",
+          "trigger"
+        ],
+        "metrics": [
+          "item_count",
+          "duration_ms"
+        ]
+      }
     },
     "bubble_hidden": {
       "category": "debug",
-      "level": "debug",
+      "level": "DEBUG",
       "when": "The bubble steps aside over a payment or government app",
       "required": [
         "reason"
       ],
-      "optional": []
+      "optional": [],
+      "groups": {
+        "context": [
+          "reason"
+        ]
+      }
     },
     "previous_run_crashed": {
       "category": "error",
-      "level": "warn",
+      "level": "WARN",
       "when": "The previous run ended in a crash and the app has started again",
       "required": [
         "exception_type"
@@ -483,16 +744,57 @@
       "optional": [
         "last_screen",
         "occurred_at"
-      ]
+      ],
+      "groups": {
+        "error": [
+          "exception_type"
+        ],
+        "context": [
+          "last_screen",
+          "occurred_at"
+        ]
+      }
     },
     "wheel_opened": {
       "category": "activity",
-      "level": "info",
+      "level": "INFO",
       "when": "The assistive wheel is opened",
       "required": [
         "app_count"
       ],
-      "optional": []
+      "optional": [],
+      "groups": {
+        "metrics": [
+          "app_count"
+        ]
+      }
+    },
+    "exception": {
+      "category": "error",
+      "level": "ERROR",
+      "when": "An exception was caught and handled rather than crashing the app",
+      "required": [
+        "exception_type"
+      ],
+      "optional": [
+        "error_code",
+        "stack_trace_hash",
+        "screen",
+        "operation",
+        "outcome"
+      ],
+      "groups": {
+        "error": [
+          "exception_type",
+          "error_code",
+          "stack_trace_hash"
+        ],
+        "context": [
+          "screen",
+          "operation",
+          "outcome"
+        ]
+      }
     }
   },
   "not_applicable": {

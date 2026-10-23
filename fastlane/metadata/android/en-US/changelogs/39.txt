@@ -1,0 +1,24 @@
+The log now uses the unified diagnostics schema, nested and OpenTelemetry-shaped
+
+- Every record is nested the way the plan specifies: source, severity, category,
+  context, correlation, error, metrics and privacy, instead of one flat object.
+  Schema version 2.0.0 — a breaking change.
+- severity is uppercase, as the plan writes it: TRACE, DEBUG, INFO, WARN, ERROR,
+  FATAL.
+- Each record now carries an event_id and an observed_timestamp, and a readable
+  message, so a log viewer has a line to show rather than a bag of fields.
+- source groups the app id, platform, environment, version, build, OS, device and
+  network; context carries the screen, a coarse feature name and the operation.
+- Where a property goes is decided by its name in one table, and CI checks that
+  table against the schema on every build, so the two cannot drift apart.
+- Caught exceptions are now recorded. The plan names captureException and it was
+  the real gap: uncaught crashes were logged, but every failure the app handled
+  and swallowed went unmentioned. Two places report it to begin with — a hidden
+  app that would not open, and the torch shortcut failing.
+- A report now waits for the background writer to catch up before it is built.
+  Without that, the events of the last few milliseconds were the ones most likely
+  to be missing from it.
+- Nothing was invented to fill the plan's fields: request_id and trace_id stay
+  null because there are no requests and no tracing, and contains_personal_data
+  records that redaction ran rather than proving anything. The storage stays a
+  local file, and the reasons are written down in docs/logging.md.

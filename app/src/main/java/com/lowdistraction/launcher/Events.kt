@@ -108,7 +108,7 @@ object Events {
     // -------------------------------------------------------------- session
     fun sessionStart(c: Context, startType: StartType, coldMs: Long, warmMs: Long) =
         log(
-            c, "session_start", "info", Category.APPLICATION.value,
+            c, "session_start", "INFO", Category.APPLICATION.value,
             "start_type" to startType.value,
             "cold_start_ms" to (if (coldMs > 0) coldMs else null),
             "warm_start_ms" to (if (warmMs > 0) warmMs else null)
@@ -116,7 +116,7 @@ object Events {
 
     fun dropOff(c: Context, lastScreen: String, lastEvent: String, durationMs: Long) =
         log(
-            c, "drop_off", "info", Category.ACTIVITY.value,
+            c, "drop_off", "INFO", Category.ACTIVITY.value,
             "last_screen" to lastScreen,
             "last_event" to lastEvent,
             "duration_ms" to durationMs
@@ -131,7 +131,7 @@ object Events {
         val duration = Diag.timeOnScreenMs()
         Diag.setScreen(name)
         log(
-            c, "screen_view", "info", Category.ACTIVITY.value,
+            c, "screen_view", "INFO", Category.ACTIVITY.value,
             "screen_name" to name,
             "previous_screen" to previous,
             "duration_ms" to duration
@@ -145,7 +145,7 @@ object Events {
         state: PermState,
         itemCount: Int?
     ) = log(
-        c, "permission_state_resolved", "info", Category.SECURITY.value,
+        c, "permission_state_resolved", "INFO", Category.SECURITY.value,
         "permission" to permission,
         "state" to state.value,
         "item_count" to itemCount
@@ -165,7 +165,7 @@ object Events {
     ) {
         val attempts = Diag.bumpFixAttempt(permission)
         log(
-            c, "access_fix_requested", "info", Category.SECURITY.value,
+            c, "access_fix_requested", "INFO", Category.SECURITY.value,
             "permission" to permission,
             "state_before" to before.value,
             "attempt_id" to attemptId,
@@ -182,7 +182,7 @@ object Events {
         outcome: Outcome,
         errorCode: String?
     ) = log(
-        c, "access_fix_result", "info", Category.SECURITY.value,
+        c, "access_fix_result", "INFO", Category.SECURITY.value,
         "attempt_id" to attemptId,
         "action_taken" to actionTaken,
         "state_after" to after.value,
@@ -192,7 +192,7 @@ object Events {
 
     fun permissionLoop(c: Context, permission: String, attempts: Int) =
         log(
-            c, "permission_loop", "warn", Category.SECURITY.value,
+            c, "permission_loop", "WARN", Category.SECURITY.value,
             "permission" to permission,
             "attempts" to attempts
         )
@@ -205,7 +205,7 @@ object Events {
         queryMs: Long,
         folders: Int?
     ) = log(
-        c, "media_query_result", "info", Category.PERFORMANCE.value,
+        c, "media_query_result", "INFO", Category.PERFORMANCE.value,
         "source" to source.value,
         "item_count" to itemCount,
         "query_ms" to queryMs,
@@ -214,7 +214,7 @@ object Events {
 
     fun appListLoaded(c: Context, itemCount: Int, queryMs: Long, hidden: Int, sortMode: String) =
         log(
-            c, "app_list_loaded", "info", Category.PERFORMANCE.value,
+            c, "app_list_loaded", "INFO", Category.PERFORMANCE.value,
             "item_count" to itemCount,
             "query_ms" to queryMs,
             "hidden_count" to hidden,
@@ -229,7 +229,7 @@ object Events {
         pauseEnabled: Boolean,
         attemptId: String
     ) = log(
-        c, "app_launch_requested", "info", Category.ACTIVITY.value,
+        c, "app_launch_requested", "INFO", Category.ACTIVITY.value,
         "package" to pkg,
         "source" to source.value,
         "pause_enabled" to pauseEnabled,
@@ -243,7 +243,7 @@ object Events {
         outcome: Outcome,
         waitedMs: Long
     ) = log(
-        c, "app_launch_result", "info", Category.ACTIVITY.value,
+        c, "app_launch_result", "INFO", Category.ACTIVITY.value,
         "package" to pkg,
         "attempt_id" to attemptId,
         "outcome" to outcome.value,
@@ -254,7 +254,7 @@ object Events {
     /** Only the length of the query is recorded — never the query itself. */
     fun searchPerformed(c: Context, queryLength: Int, resultCount: Int, source: SearchSource) =
         log(
-            c, "search_performed", "info", Category.ACTIVITY.value,
+            c, "search_performed", "INFO", Category.ACTIVITY.value,
             "query_length" to queryLength,
             "result_count" to resultCount,
             "source" to source.value
@@ -262,7 +262,7 @@ object Events {
 
     fun searchNoResults(c: Context, queryLength: Int, source: SearchSource) =
         log(
-            c, "search_no_results", "info", Category.ACTIVITY.value,
+            c, "search_no_results", "INFO", Category.ACTIVITY.value,
             "query_length" to queryLength,
             "source" to source.value
         )
@@ -270,14 +270,14 @@ object Events {
     // -------------------------------------------------------------- settings
     fun settingsChanged(c: Context, setting: String, value: String?) =
         log(
-            c, "settings_changed", "info", Category.AUDIT.value,
+            c, "settings_changed", "INFO", Category.AUDIT.value,
             "setting" to setting,
             "value" to value
         )
 
     fun diagnosticsToggled(c: Context, enabled: Boolean) =
         log(
-            c, "diagnostics_action", "info", Category.AUDIT.value,
+            c, "diagnostics_action", "INFO", Category.AUDIT.value,
             "action" to "toggle",
             "value" to enabled
         )
@@ -290,7 +290,7 @@ object Events {
         bytes: Long?,
         entries: Int?
     ) = log(
-        c, "diagnostics_action", "info", Category.AUDIT.value,
+        c, "diagnostics_action", "INFO", Category.AUDIT.value,
         "action" to action.value,
         "format" to format?.value,
         "channel" to channel?.value,
@@ -299,29 +299,29 @@ object Events {
     )
 
     fun bubbleToggled(c: Context, enabled: Boolean) =
-        log(c, "bubble_toggled", "info", Category.ACTIVITY.value, "enabled" to enabled)
+        log(c, "bubble_toggled", "INFO", Category.ACTIVITY.value, "enabled" to enabled)
 
     // ----------------------------------------------------------------- guide
     fun guideStep(c: Context, step: Int, total: Int) =
-        log(c, "guide_step", "info", Category.ACTIVITY.value, "step" to step, "total" to total)
+        log(c, "guide_step", "INFO", Category.ACTIVITY.value, "step" to step, "total" to total)
 
     fun guideFinished(c: Context, stepsSeen: Int, skipped: Boolean) =
-        log(c, "guide_finished", "info", Category.ACTIVITY.value, "steps_seen" to stepsSeen, "skipped" to skipped)
+        log(c, "guide_finished", "INFO", Category.ACTIVITY.value, "steps_seen" to stepsSeen, "skipped" to skipped)
 
     fun teaMode(c: Context, action: TeaAction, durationMs: Long?) =
         log(
-            c, "tea_mode", "info", Category.ACTIVITY.value,
+            c, "tea_mode", "INFO", Category.ACTIVITY.value,
             "action" to action.value,
             "duration_ms" to durationMs
         )
 
     // ------------------------------------------------------------ health
     fun performanceMarker(c: Context, flow: String, durationMs: Long) =
-        log(c, "performance_marker", "info", Category.PERFORMANCE.value, "flow" to flow, "duration_ms" to durationMs)
+        log(c, "performance_marker", "INFO", Category.PERFORMANCE.value, "flow" to flow, "duration_ms" to durationMs)
 
     fun errorStateShown(c: Context, errorCode: String, screen: String, messageKey: String?) =
         log(
-            c, "error_state_shown", "warn", Category.ERROR.value,
+            c, "error_state_shown", "WARN", Category.ERROR.value,
             "error_code" to errorCode,
             "screen" to screen,
             "message_key" to messageKey
@@ -338,8 +338,7 @@ object Events {
         mainThread: Boolean,
         uptimeMs: Long
     ) = log(
-        c, "crash", "fatal", Category.ERROR.value,
-        "fatal" to true,
+        c, "crash", "FATAL", Category.ERROR.value,
         "exception_type" to exceptionType,
         "stack_trace_hash" to stackHash,
         // The trace itself, not only a hash of it: a hash says two crashes match,
@@ -363,40 +362,40 @@ object Events {
         lastScreen: String,
         occurredAt: String
     ) = log(
-        c, "previous_run_crashed", "warn", Category.ERROR.value,
+        c, "previous_run_crashed", "WARN", Category.ERROR.value,
         "exception_type" to exceptionType,
         "last_screen" to lastScreen,
         "occurred_at" to occurredAt
     )
 
     fun anr(c: Context, durationMs: Long, screen: String) =
-        log(c, "anr", "warn", Category.ERROR.value, "duration_ms" to durationMs, "last_screen" to screen)
+        log(c, "anr", "WARN", Category.ERROR.value, "duration_ms" to durationMs, "last_screen" to screen)
 
     // ------------------------------------------------------------- signals
     fun rageTap(c: Context, target: String, taps: Int, windowMs: Long) =
         log(
-            c, "rage_tap", "warn", Category.ACTIVITY.value,
+            c, "rage_tap", "WARN", Category.ACTIVITY.value,
             "target" to target,
             "taps" to taps,
             "window_ms" to windowMs
         )
 
     fun deadClick(c: Context, target: String) =
-        log(c, "dead_click", "info", Category.ACTIVITY.value, "target" to target)
+        log(c, "dead_click", "INFO", Category.ACTIVITY.value, "target" to target)
 
     fun backButtonSpam(c: Context, presses: Int, windowMs: Long, screen: String) =
         log(
-            c, "back_button_spam", "warn", Category.ACTIVITY.value,
+            c, "back_button_spam", "WARN", Category.ACTIVITY.value,
             "presses" to presses,
             "window_ms" to windowMs,
             "screen" to screen
         )
 
     fun scrollDepth(c: Context, percent: Int, screen: String) =
-        log(c, "scroll_depth", "info", Category.ACTIVITY.value, "percent" to percent, "screen" to screen)
+        log(c, "scroll_depth", "INFO", Category.ACTIVITY.value, "percent" to percent, "screen" to screen)
 
     fun timeToFirstValue(c: Context, flow: String, durationMs: Long) =
-        log(c, "time_to_first_value", "info", Category.PERFORMANCE.value, "flow" to flow, "duration_ms" to durationMs)
+        log(c, "time_to_first_value", "INFO", Category.PERFORMANCE.value, "flow" to flow, "duration_ms" to durationMs)
 
     // ----------------------------------------------------------- background
     fun fileIndexRebuild(
@@ -406,7 +405,7 @@ object Events {
         durationMs: Long?,
         trigger: String?
     ) = log(
-        c, "file_index_rebuild", "info", Category.BACKGROUND.value,
+        c, "file_index_rebuild", "INFO", Category.BACKGROUND.value,
         "outcome" to outcome.value,
         "item_count" to itemCount,
         "duration_ms" to durationMs,
@@ -415,9 +414,33 @@ object Events {
 
     // ------------------------------------------------------------------ debug
     fun bubbleHidden(c: Context, reason: String) =
-        log(c, "bubble_hidden", "debug", Category.DEBUG.value, "reason" to reason)
+        log(c, "bubble_hidden", "DEBUG", Category.DEBUG.value, "reason" to reason)
 
     // ------------------------------------------------------------- adoption
     fun wheelOpened(c: Context, appCount: Int) =
-        log(c, "wheel_opened", "info", Category.ACTIVITY.value, "app_count" to appCount)
+        log(c, "wheel_opened", "INFO", Category.ACTIVITY.value, "app_count" to appCount)
+
+    // ------------------------------------------------- handled exceptions
+    /**
+     * An exception that was caught and handled rather than crashing the app.
+     *
+     * The plan names `captureException` as part of the SDK surface, and it was
+     * the real gap here: uncaught exceptions were recorded, but every failure
+     * the app swallowed went unmentioned.
+     */
+    fun exception(
+        c: Context,
+        exceptionType: String,
+        operation: String,
+        outcome: Outcome,
+        errorCode: String?,
+        stackHash: String?
+    ) = log(
+        c, "exception", "ERROR", Category.ERROR.value,
+        "exception_type" to exceptionType,
+        "operation" to operation,
+        "outcome" to outcome.value,
+        "error_code" to errorCode,
+        "stack_trace_hash" to stackHash
+    )
 }

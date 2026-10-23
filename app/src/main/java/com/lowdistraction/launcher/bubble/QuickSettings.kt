@@ -9,6 +9,7 @@ import android.media.AudioManager
 import android.net.Uri
 import android.provider.Settings
 import android.widget.Toast
+import com.lowdistraction.launcher.Events
 
 /**
  * The device-setting shortcuts shown from the bubble's long-press panel.
@@ -32,7 +33,13 @@ object QuickSettings {
             torchId = id
             torchOn = !torchOn
             cm.setTorchMode(id, torchOn)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            // Handled, but worth recording: "the torch button does nothing" is a
+            // question a report should be able to answer.
+            Events.exception(
+                context, e.javaClass.name, "toggle_torch", Events.Outcome.FAILED,
+                "torch_unavailable", null
+            )
             toast(context, "Torch not available")
         }
     }

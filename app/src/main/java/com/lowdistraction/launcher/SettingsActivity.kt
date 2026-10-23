@@ -263,16 +263,23 @@ class SettingsActivity : Activity() {
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         try {
             startActivity(intent)
-        } catch (_: Exception) {
-            reportOpenFailure()
+        } catch (e: Exception) {
+            reportOpenFailure(e)
             Toast.makeText(this, getString(R.string.hidden_open_failed, label), Toast.LENGTH_LONG)
                 .show()
         }
     }
 
     /** A hidden app that would not open is a friction point worth recording. */
-    private fun reportOpenFailure() {
+    private fun reportOpenFailure(e: Exception? = null) {
         Events.errorStateShown(this, "hidden_open_failed", "Settings", "hidden_open_failed")
+        // A caught exception is still an exception: the plan's captureException.
+        if (e != null) {
+            Events.exception(
+                this, e.javaClass.name, "open_hidden_app", Events.Outcome.FAILED,
+                "hidden_open_failed", null
+            )
+        }
     }
 
     private fun labelOf(pkg: String): String = try {

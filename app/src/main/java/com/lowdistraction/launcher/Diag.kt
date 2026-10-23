@@ -16,15 +16,16 @@ import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * The structured diagnostics log.
  *
- * One JSON object per line, in the app's own private storage. Every record
- * carries the common event envelope (schema_version, timestamp, session_id,
- * platform, app_version, os, device_model, network_type, screen_or_route,
- * log_level, release_channel) plus that event's own properties — see
+ * One JSON object per line, in the app's own private storage. Every record is
+ * nested the way the unified diagnostics plan asks for: schema_version, event_id,
+ * timestamp, observed_timestamp, source, severity, category, event_name, message,
+ * context, correlation, error, metrics and privacy — see
  * `tools/logging_schema.json` for the schema and `docs/logging.md` for the
  * reasoning.
  *
@@ -43,9 +44,9 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 object Diag {
 
-    const val SCHEMA_VERSION = "1.1.0"
+    const val SCHEMA_VERSION = "2.0.0"
     const val PLATFORM = "android"
-    const val RELEASE_CHANNEL = "production"
+    const val ENVIRONMENT = "production"
 
     private const val PREFS = "diagnostics_prefs"
     private const val KEY_ENABLED = "enabled"
@@ -72,11 +73,11 @@ object Diag {
     private val SAMPLED =
         setOf("scroll_depth", "screen_view", "performance_marker", "media_query_result")
 
-    /** Keys that belong to the envelope rather than to an individual event. */
+    /** The envelope's own keys, at the top level of a nested record. */
     val ENVELOPE = setOf(
-        "event_name", "schema_version", "timestamp", "session_id", "attempt_id",
-        "platform", "app_id", "app_version", "os", "device_model", "network_type",
-        "screen_or_route", "category", "log_level", "release_channel"
+        "schema_version", "event_id", "timestamp", "observed_timestamp", "source",
+        "severity", "category", "event_name", "message", "context", "correlation",
+        "error", "metrics", "privacy", "attributes"
     )
 
     data class Event(
@@ -268,39 +269,98 @@ object Diag {
         category: String,
         props: List<Pair<String, Any?>>
     ): String {
-        val o = JSONObject()
-        o.put("event_name", name)
-        o.put("schema_version", SCHEMA_VERSION)
-        o.put("timestamp", LogFormat.isoUtc(System.currentTimeMillis()))
-        o.put("session_id", sessionId())
-        o.put("platform", PLATFORM)
-        o.put("app_id", c.packageName)
-        o.put("app_version", appVersion(c))
-        o.put("os", osName())
-        o.put("device_model", deviceModel())
-        o.put("network_type", networkType(c))
-        o.put("screen_or_route", currentScreen)
-        o.put("category", category)
-        o.put("log_level", level)
-        o.put("release_channel", RELEASE_CHANNEL)
+        val now = System.currentTimeMillis()
+        val iso = LogFormat.isoUtc(now)
 
+        // Each property goes to the group its name belongs to. Anything the
+        // schema does not place lands in attributes, and the CI check keeps this
+        // table and the schema in step.
+        val groups = LinkedHashMap<String, JSONObject>()
+        for (group in listOf(
+            LogGroups.CONTEXT, LogGroups.CORRELATION, LogGroups.ERROR,
+            LogGroups.METRICS, LogGroups.ATTRIBUTES
+        )) {
+            groups[group] = JSONObject()
+        }
+        var attempt: String? = null
         for ((k, v) in props) {
             if (v == null) continue
+            if (k == "attempt_id") {
+                attempt = v.toString()
+                continue
+            }
+            val group = LogGroups.of(k)
+            val target = groups.getValue(group)
+            val cap = if (k == "stack_trace") TRACE_CAP else LogFormat.VALUE_CAP
             when (v) {
-                is Int -> o.put(k, v)
-                is Long -> o.put(k, v)
-                is Boolean -> o.put(k, v)
-                is Double -> o.put(k, v)
-                is Float -> o.put(k, v.toDouble())
-                else -> {
-                    val cap =
-                        if (k == "stack_trace") TRACE_CAP else LogFormat.VALUE_CAP
-                    o.put(k, LogFormat.redact(v.toString(), cap))
-                }
+                is Int -> target.put(k, v)
+                is Long -> target.put(k, v)
+                is Boolean -> target.put(k, v)
+                is Double -> target.put(k, v)
+                is Float -> target.put(k, v.toDouble())
+                else -> target.put(k, LogFormat.redact(v.toString(), cap))
             }
         }
+
+        val context = groups.getValue(LogGroups.CONTEXT)
+        if (!context.has("screen")) context.put("screen", currentScreen)
+        context.put("feature", featureOf(name))
+        context.put("operation", name)
+
+        val o = JSONObject()
+        o.put("schema_version", SCHEMA_VERSION)
+        o.put("event_id", "evt_" + shortId())
+        o.put("timestamp", iso)
+        // Nothing ingests these records, so the source clock and our clock are
+        // the same reading. Both are kept because the standard asks for both.
+        o.put("observed_timestamp", iso)
+        o.put("source", JSONObject().apply {
+            put("app_id", c.packageName)
+            put("platform", PLATFORM)
+            put("environment", ENVIRONMENT)
+            put("app_version", appVersion(c))
+            put("build", versionCode(c))
+            put("os", osName())
+            put("device_model", deviceModel())
+            put("network_type", networkType(c))
+        })
+        o.put("severity", level)
+        o.put("category", category)
+        o.put("event_name", name)
+        o.put("message", LogFormat.redact(summary(name, props)))
+        o.put("context", context)
+        o.put("correlation", groups.getValue(LogGroups.CORRELATION).apply {
+            put("session_id", sessionId())
+            put("attempt_id", attempt ?: JSONObject.NULL)
+            put("request_id", JSONObject.NULL)
+            put("trace_id", JSONObject.NULL)
+        })
+        val error = groups.getValue(LogGroups.ERROR)
+        o.put("error", if (error.length() > 0) error else JSONObject.NULL)
+        val metrics = groups.getValue(LogGroups.METRICS)
+        o.put("metrics", if (metrics.length() > 0) metrics else JSONObject.NULL)
+        o.put("privacy", JSONObject().apply {
+            put("redacted", true)
+            // Not a proof of anything — the standard says so itself. It records
+            // that the redaction pass ran and no check flagged personal data.
+            put("contains_personal_data", false)
+        })
+        val attributes = groups.getValue(LogGroups.ATTRIBUTES)
+        if (attributes.length() > 0) o.put("attributes", attributes)
         return o.toString()
     }
+
+    /** A readable one-liner for the log explorer: the name, then the gist. */
+    private fun summary(name: String, props: List<Pair<String, Any?>>): String {
+        val gist = props.asSequence()
+            .filter { it.second != null }
+            .take(4)
+            .joinToString(" ") { it.first + "=" + it.second }
+        return if (gist.isEmpty()) name else name + " — " + gist
+    }
+
+    /** A coarse feature name, so events can be grouped without another field. */
+    private fun featureOf(name: String): String = name.substringBefore('_')
 
     /** Hands a line to the writer thread. Never blocks the caller on the disk. */
     private fun enqueue(c: Context, line: String) {
@@ -328,10 +388,14 @@ object Diag {
         val last = tail(c).lastOrNull() ?: return
         val o = runCatching { JSONObject(last) }.getOrNull() ?: return
         if (o.optString("event_name") != "crash") return
+        // The exception type is in `error` and the screen in `context`: a crash
+        // record is nested like every other one.
+        val error = o.optJSONObject("error")
+        val context = o.optJSONObject("context")
         Events.previousRunCrashed(
             c,
-            o.optString("exception_type", "unknown"),
-            o.optString("screen_or_route", "—"),
+            error?.optString("exception_type", "unknown") ?: "unknown",
+            context?.optString("screen", "—") ?: "—",
             o.optString("timestamp", "")
         )
     }
@@ -371,25 +435,47 @@ object Diag {
             val name = o.optString("event_name", "")
             if (name.isEmpty()) continue
             val time = LogFormat.parseIso(o.optString("timestamp", "")) ?: 0L
-            val level = o.optString("log_level", "info")
+            val severity = o.optString("severity", "INFO")
+            val context = o.optJSONObject("context")
+            val correlation = o.optJSONObject("correlation")
+
+            // Flattened for display and for the spreadsheet: the groups are how
+            // it is stored, not how it is read.
             val props = LinkedHashMap<String, String>()
-            val keys = o.keys()
-            while (keys.hasNext()) {
-                val k = keys.next()
-                if (k in ENVELOPE) continue
-                props[k] = o.optString(k, "")
+            for (group in listOf("context", "metrics", "error", "attributes")) {
+                val g = o.optJSONObject(group) ?: continue
+                val keys = g.keys()
+                while (keys.hasNext()) {
+                    val k = keys.next()
+                    props[k] = g.optString(k, "")
+                }
             }
+            correlation?.optString("attempt_id", "")
+                ?.takeIf { it.isNotEmpty() && it != "null" }
+                ?.let { props["attempt_id"] = it }
+
             out.add(
                 Event(
-                    name, time, level,
+                    name, time, severity,
                     o.optString("category", "application"),
-                    o.optString("screen_or_route", "—"),
-                    o.optString("session_id", ""),
+                    context?.optString("screen", "—") ?: "—",
+                    correlation?.optString("session_id", "") ?: "",
                     props
                 )
             )
         }
         return out
+    }
+
+    /**
+     * Waits for the writer to catch up.
+     *
+     * Called before a report is built: without it, the events of the last few
+     * milliseconds could still be in the queue, and the report would be missing
+     * exactly the most recent thing that happened.
+     */
+    fun flush() {
+        runCatching { writer.submit { }.get(2, TimeUnit.SECONDS) }
     }
 
     fun clear(c: Context) {

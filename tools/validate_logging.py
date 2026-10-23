@@ -52,10 +52,10 @@ CATEGORY_CONST = {
     "DEBUG": "debug",
 }
 
-# name, level, category — a call without a category will not match at all, so the
-# "declared but never logged" check catches it.
+# name, SEVERITY, category — a call without a category will not match at all, so
+# the "declared but never logged" check catches it.
 CALL_START = re.compile(
-    r"\blog\(\s*c\s*,\s*\"([a-z0-9_]+)\"\s*,\s*\"([a-z]+)\"\s*,\s*"
+    r"\blog\(\s*c\s*,\s*\"([a-z0-9_]+)\"\s*,\s*\"([A-Za-z]+)\"\s*,\s*"
     r"([A-Za-z_][A-Za-z0-9_.]*)"
 )
 
@@ -188,6 +188,40 @@ def validate():
         if f"Events.{fn}(" in outside_all or fn in internal_calls:
             continue
         problems.append(f"{fn}(): declared in Events.kt but never called from the app")
+
+    # LogGroups.kt decides where each property sits in the nested record. It must
+    # agree with the schema, or a property would be filed in the wrong group.
+    groups_kt = os.path.join(
+        JAVA_ROOT, "com", "lowdistraction", "launcher", "LogGroups.kt"
+    )
+    if not os.path.exists(groups_kt):
+        problems.append("LogGroups.kt is missing — Diag needs it to nest an event")
+    else:
+        kt = open(groups_kt, encoding="utf-8").read()
+        declared = dict(re.findall(r'"([a-z0-9_]+)" to ([A-Z]+),', kt))
+        const = {
+            "CONTEXT": "context",
+            "CORRELATION": "correlation",
+            "ERROR": "error",
+            "METRICS": "metrics",
+        }
+        wanted = {}
+        for spec in schema["events"].values():
+            for group, keys in spec.get("groups", {}).items():
+                for key in keys:
+                    wanted[key] = group
+        for key in sorted(wanted):
+            got = const.get(declared.get(key, ""))
+            if got is None:
+                problems.append(
+                    f"LogGroups.kt does not place '{key}' (the schema puts it in {wanted[key]})"
+                )
+            elif got != wanted[key]:
+                problems.append(
+                    f"LogGroups.kt puts '{key}' in {got}; the schema says {wanted[key]}"
+                )
+        for key in sorted(set(declared) - set(wanted)):
+            problems.append(f"LogGroups.kt places '{key}', which no event uses")
 
     # The Kotlin enums must not drift from the schema enums.
     for kt_name, schema_name in KOTLIN_ENUMS.items():

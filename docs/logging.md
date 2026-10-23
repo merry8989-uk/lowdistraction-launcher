@@ -5,10 +5,13 @@ diagnosed from a report the user sends, instead of from guesswork. The schema is
 shared with the ProGallery logging standard, so events from both can be joined
 and compared.
 
-Schema version: **1.1.0** · canonical definition: [`tools/logging_schema.json`](../tools/logging_schema.json)
+Schema version: **2.0.0** · canonical definition: [`tools/logging_schema.json`](../tools/logging_schema.json)
 
-Version 1.1.0 added the six severity levels, a **category** on every event, and
-`app_id` in the envelope.
+Version 2.0.0 is a breaking change: the flat envelope became the **nested** shape
+the unified diagnostics plan asks for, following the OpenTelemetry logs data
+model. `log_level` became an uppercase **`severity`**, and `event_id` and
+`observed_timestamp` were added. Version 1.1.0 had added the six severity levels
+and a category on every event; 1.2.0 kept the full crash stack trace.
 
 ## The one rule
 
@@ -35,35 +38,73 @@ leave the phone when the user exports, shares or mails it.
 
 ## The envelope
 
-Every event carries these keys, added automatically by `Diag`:
+Every event is written nested, the way the plan's sample shows it:
 
-`event_name` · `schema_version` · `timestamp` (ISO 8601 UTC) · `session_id` ·
-`platform` · `app_id` · `app_version` · `os` · `device_model` · `network_type` ·
-`screen_or_route` · `category` · `log_level` · `release_channel`
+```json
+{
+  "schema_version": "2.0.0",
+  "event_id": "evt_ab12cd34",
+  "timestamp": "2026-10-24T00:30:00Z",
+  "observed_timestamp": "2026-10-24T00:30:00Z",
+  "source": {
+    "app_id": "com.lowdistraction.launcher",
+    "platform": "android",
+    "environment": "production",
+    "app_version": "1.38",
+    "build": "39",
+    "os": "Android 14",
+    "device_model": "Pixel 6",
+    "network_type": "offline"
+  },
+  "severity": "WARN",
+  "category": "activity",
+  "event_name": "rage_tap",
+  "message": "rage_tap — taps=5 screen=Home",
+  "context": { "screen": "Home", "feature": "rage", "operation": "rage_tap", "taps": 5 },
+  "correlation": {
+    "session_id": "sess_9f2c1a04",
+    "attempt_id": null,
+    "request_id": null,
+    "trace_id": null
+  },
+  "error": null,
+  "metrics": null,
+  "privacy": { "redacted": true, "contains_personal_data": false }
+}
+```
 
-Two fields the standard asks for are carried by something already here, rather
-than duplicated:
+Which group a property lands in is decided by its name, in
+[`LogGroups.kt`](../app/src/main/java/com/lowdistraction/launcher/LogGroups.kt):
+`context`, `correlation`, `error`, `metrics`, and anything the schema does not
+place in `attributes`. The CI check compares that table with the schema on every
+build, so the two cannot drift.
 
-- **`severity`** is `log_level`.
-- **`environment`** is `release_channel` (production / beta).
-- **`request_id`** does not exist, because there are no requests. `attempt_id`
-  links one user action to its outcome instead.
+Three things are **not** invented to fill the plan's fields:
+
+- **`request_id`** and **`trace_id`** are `null`. There are no requests and no
+distributed tracing. `correlation.attempt_id` links one user action to its
+outcome instead.
+- **`observed_timestamp`** equals `timestamp`. Nothing ingests these records, so
+the source clock and our clock are the same reading. Both are kept because the
+standard asks for both.
+- **`contains_personal_data`** is a record that the redaction pass ran, not proof
+  of anything — the plan says as much itself.
 
 ### Severity
 
-The six levels the standard lists are all used:
+The six levels the plan lists, uppercase as it writes them:
 
 | Level | Used for |
 | --- | --- |
-| `trace` | available; nothing is fine-grained enough to need it yet |
-| `debug` | internals worth knowing when something misbehaves — the bubble stepping aside, say |
-| `info` | ordinary events: screens, launches, searches, settings |
-| `warn` | a potential problem: rage taps, freezes, an error put on screen |
-| `error` | an operation failed: a file index rebuild, a report that would not write |
-| `fatal` | a crash |
+| `TRACE` | available; nothing is fine-grained enough to need it yet |
+| `DEBUG` | internals worth knowing when something misbehaves — the bubble stepping aside, say |
+| `INFO` | ordinary events: screens, launches, searches, settings |
+| `WARN` | a potential problem: rage taps, freezes, an error put on screen |
+| `ERROR` | an operation failed, or an exception was caught and handled |
+| `FATAL` | a crash |
 
-`attempt_id` is added where an action has an outcome. Event-specific properties
-sit alongside these as flat keys.
+`attempt_id` is added where an action has an outcome. Everything else is an
+event-specific property, filed into one of the groups above.
 
 `user_id` is **omitted entirely**: the app has no accounts and no sign-in, so
 there is no identifier to hash — and none is invented to fill the gap.
@@ -82,7 +123,7 @@ there is no identifier to hash — and none is invented to fill the gap.
 **Preferences and screens** — `settings_changed`, `bubble_toggled`,
 `diagnostics_action`, `guide_step`, `guide_finished`, `tea_mode`
 
-**Health** — `performance_marker`, `error_state_shown`, `crash`, `previous_run_crashed`, `anr`
+**Health** — `performance_marker`, `error_state_shown`, `crash`, `previous_run_crashed`, `exception`, `anr`
 
 **Adoption** — `wheel_opened`
 
@@ -104,7 +145,7 @@ local, offline Android launcher — including the ones that cannot exist here.
 | # | Category | Here |
 | --- | --- | --- |
 | 1 | Application | **yes** — `session_start`, screens, launches, settings |
-| 2 | Error | **yes** — `crash` (fatal, with the stack trace), `previous_run_crashed`, `anr`, `error_state_shown` |
+| 2 | Error | **yes** — `crash` (FATAL, with the stack trace), `previous_run_crashed`, `exception` (caught and handled), `anr`, `error_state_shown` |
 | 3 | Security | **yes** — `permission_state_resolved`, `access_fix_requested`/`_result`, `permission_loop`. No logins and no requests exist to log |
 | 4 | Performance | **yes** — `performance_marker`, `app_list_loaded`, `media_query_result`, plus memory in the report |
 | 5 | User activity | **yes** — searches, scroll depth, rage taps, dead clicks, guide steps, tea mode |
@@ -120,6 +161,42 @@ Every event carries a `category`, the report prints a count per category, and
 the schema check in CI fails if an event's category is missing or does not match
 the schema. A category sitting at zero in the report is honest: it says the
 category applies and simply has not happened yet.
+
+## The plan, and what applies here
+
+The unified diagnostics plan describes a system of four parts. This app is one
+of them, so this is the honest mapping.
+
+| Part of the plan | Here |
+| --- | --- |
+| Android SDK (Kotlin) | **this is it** — the event API, the policy engine, the sanitizer, the normalizer, the local writer and the export engine |
+| Web SDK (TypeScript, IndexedDB) | **not applicable** — there is no website |
+| Backend instrumentation | **not applicable** — there is no backend |
+| Diagnostics dashboard | **partly**: the in-app Diagnostics screen with its report, and the plan's local storage rule. A multi-device Log Explorer cannot exist here — see below |
+
+**Storage.** The plan's table suggests SQLite for Android. This keeps an
+append-only JSONL file instead, deliberately: the log is capped at 512 KB and
+about 5,000 records, which is parsed in memory in a few milliseconds, so an index
+buys nothing. SQLite would earn its place the moment this became the multi-device
+dashboard the plan describes, and that day is the day to move.
+
+**A shared dashboard across devices cannot exist here.** The plan says this
+itself: with local-only storage, one device's logs cannot reach another's
+dashboard without an explicitly permitted transfer. This app has no internet
+permission at all, so the only transfers available are the ones the user
+performs — export, share, mail. That is a property of the design, not a gap.
+
+**Import is not implemented.** The plan mentions a validated import engine, which
+only matters once there is something to import from. Exports are validated in the
+sense that a test unzips a report and compares every entry with its renderer.
+
+### `flush()`
+
+Every event goes to a background writer, so a report built immediately after an
+event could miss it. `Diag.flush()` waits for the writer to catch up and is called
+before a report is built — otherwise the freshest records are the ones most
+likely to be missing from it. The one exception is a `fatal` record, which is
+written synchronously because the process is about to die.
 
 ### Crash reporting without a service
 
