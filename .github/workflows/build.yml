@@ -37,6 +37,11 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
+      # The pure half of the logging pipeline: the JSON/CSV/markdown encodings,
+      # the redaction rules, the report renderers and the zip.
+      - name: Unit tests
+        run: ./gradlew test --no-daemon
+
       - name: Build signed release APK
         env:
           SIGNING_KEYSTORE: ${{ runner.temp }}/release.keystore

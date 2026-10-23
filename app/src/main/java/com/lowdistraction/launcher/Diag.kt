@@ -12,10 +12,7 @@ import java.io.PrintWriter
 import java.io.RandomAccessFile
 import java.io.StringWriter
 import java.security.MessageDigest
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
-import java.util.TimeZone
 import java.util.UUID
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -59,7 +56,6 @@ object Diag {
     private const val RETENTION_DAYS = 14L
     private const val MAX_READ = 5000
     private const val SAMPLE_1_IN = 5
-    private const val VALUE_CAP = 240
     private const val TICK_MS = 1000L
     private const val STALL_MS = 2000L
 
@@ -256,7 +252,7 @@ object Diag {
         val o = JSONObject()
         o.put("event_name", name)
         o.put("schema_version", SCHEMA_VERSION)
-        o.put("timestamp", isoUtc(System.currentTimeMillis()))
+        o.put("timestamp", LogFormat.isoUtc(System.currentTimeMillis()))
         o.put("session_id", sessionId())
         o.put("platform", PLATFORM)
         o.put("app_id", c.packageName)
@@ -277,7 +273,7 @@ object Diag {
                 is Boolean -> o.put(k, v)
                 is Double -> o.put(k, v)
                 is Float -> o.put(k, v.toDouble())
-                else -> o.put(k, redact(v.toString()))
+                else -> o.put(k, LogFormat.redact(v.toString()))
             }
         }
         return o.toString()
@@ -330,7 +326,7 @@ object Diag {
             val o = runCatching { JSONObject(raw) }.getOrNull() ?: continue
             val name = o.optString("event_name", "")
             if (name.isEmpty()) continue
-            val time = parseIso(o.optString("timestamp", "")) ?: 0L
+            val time = LogFormat.parseIso(o.optString("timestamp", "")) ?: 0L
             val level = o.optString("log_level", "info")
             val props = LinkedHashMap<String, String>()
             val keys = o.keys()
@@ -410,7 +406,7 @@ object Diag {
             for (line in f.readLines()) {
                 if (line.isBlank()) continue
                 val t = runCatching { JSONObject(line) }.getOrNull()
-                    ?.let { parseIso(it.optString("timestamp", "")) } ?: 0L
+                    ?.let { LogFormat.parseIso(it.optString("timestamp", "")) } ?: 0L
                 if (t in 1L until cutoff) dropped++ else kept.add(line)
             }
             if (dropped > 0) {
@@ -502,34 +498,8 @@ object Diag {
         }
     }.getOrDefault("offline")
 
-    // ------------------------------------------------------------- redaction
-    private val emailPattern =
-        Regex("[A-Za-z0-9._%+\\-]+@[A-Za-z0-9.\\-]+\\.[A-Za-z]{2,}")
-    private val digitRun = Regex("\\d{7,}")
-    private val pathPattern = Regex("(?:/[\\w.\\-]+){2,}")
-
-    /** The same rules the web side uses: no email, no long numbers, no paths. */
-    fun redact(value: String): String {
-        var s = emailPattern.replace(value, "[email]")
-        s = digitRun.replace(s, "[number]")
-        s = pathPattern.replace(s, "[path]")
-        return if (s.length > VALUE_CAP) s.substring(0, VALUE_CAP) + "…" else s
-    }
-
-    // --------------------------------------------------------------- helpers
-    fun stamp(time: Long): String =
-        SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US).format(Date(time))
-
-    private fun isoUtc(t: Long): String =
-        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply {
-            timeZone = TimeZone.getTimeZone("UTC")
-        }.format(Date(t))
-
-    private fun parseIso(s: String): Long? = runCatching {
-        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply {
-            timeZone = TimeZone.getTimeZone("UTC")
-        }.parse(s)?.time
-    }.getOrNull()
+    // Timestamps, redaction and the output encodings all live in [LogFormat],
+    // which is deliberately free of Android so it can be unit-tested on the JVM.
 
     private fun shortId(): String =
         UUID.randomUUID().toString().replace("-", "").take(8)

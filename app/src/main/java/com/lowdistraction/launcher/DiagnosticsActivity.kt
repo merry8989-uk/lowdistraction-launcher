@@ -16,10 +16,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.FileProvider
-import java.io.ByteArrayOutputStream
 import java.io.File
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
 
 /**
  * The diagnostics screen.
@@ -319,27 +316,10 @@ class DiagnosticsActivity : Activity() {
 
     /** Renders one report. A `.zip` holds all four shapes in a single archive. */
     private fun renderOne(r: DiagnosticsReport.Report, ext: String): Blob = when (ext) {
-        "zip" -> Blob(renderZip(r), "zip", "application/zip")
-        else -> Blob(render(r, ext).toByteArray(Charsets.UTF_8), ext, mime(ext))
-    }
-
-    private fun renderZip(r: DiagnosticsReport.Report): ByteArray {
-        val out = ByteArrayOutputStream()
-        ZipOutputStream(out).use { zip ->
-            for (ext in TEXT_FORMATS) {
-                zip.putNextEntry(ZipEntry("lowdistraction-diagnostics.$ext"))
-                zip.write(render(r, ext).toByteArray(Charsets.UTF_8))
-                zip.closeEntry()
-            }
-        }
-        return out.toByteArray()
-    }
-
-    private fun render(r: DiagnosticsReport.Report, ext: String): String = when (ext) {
-        "md" -> DiagnosticsReport.renderMarkdown(r)
-        "json" -> DiagnosticsReport.renderJson(r)
-        "csv" -> DiagnosticsReport.renderCsv(r)
-        else -> DiagnosticsReport.renderText(r)
+        "zip" -> Blob(DiagnosticsReport.renderZip(r), "zip", "application/zip")
+        else -> Blob(
+            DiagnosticsReport.render(r, ext).toByteArray(Charsets.UTF_8), ext, mime(ext)
+        )
     }
 
     private fun formatOf(ext: String): Events.ExportFormat = when (ext) {
@@ -586,9 +566,6 @@ class DiagnosticsActivity : Activity() {
     private companion object {
         const val REQUEST_SAVE = 4401
         const val PREVIEW_LIMIT = 12000
-
-        /** The four text shapes; a .zip bundles exactly these. */
-        val TEXT_FORMATS = arrayOf("txt", "md", "json", "csv")
 
         /** What Export and Share offer. */
         val EXPORT_FORMATS = arrayOf("txt", "md", "json", "csv", "zip")

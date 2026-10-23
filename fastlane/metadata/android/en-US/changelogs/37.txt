@@ -1,0 +1,18 @@
+The logging pipeline now has tests, and they run on every build
+
+- A new unit test suite covers the parts that were hand-rolled and therefore the
+  parts most worth pinning down: the JSON escaping, the CSV quoting, the
+  markdown table escaping, the redaction rules, the report renderers and the zip.
+- The zip was the biggest gap. It is now opened by a test that checks it holds
+  all four reports and that each entry matches its renderer byte for byte.
+- Redaction is tested against the things it promises to remove — an email
+  address, a long digit run, a filesystem path — and against the things it must
+  leave alone, so a rule that is too greedy is caught too.
+- The counts behind Signals and Log health are tested, including the one the
+  logging standard exists for: three permission fixes requested with one result
+  must report two unmatched.
+- The pure half of the pipeline moved into its own LogFormat, free of Android,
+  which is what makes all of this testable off a device. Nothing about the log
+  itself changed.
+- CI runs ./gradlew test on every push, so a broken encoding or a loosened
+  redaction rule now fails the build instead of shipping.

@@ -19,8 +19,8 @@ android {
         applicationId = "com.lowdistraction.launcher"
         minSdk = 26
         targetSdk = 34
-        versionCode = 36
-        versionName = "1.35"
+        versionCode = 37
+        versionName = "1.36"
     }
 
     signingConfigs {
@@ -63,6 +63,10 @@ android {
 dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.recyclerview:recyclerview:1.3.2")
+
+    // The logging pipeline's pure half — encodings, redaction, the report
+    // renderers and the zip — is unit-tested on the JVM. Run with ./gradlew test.
+    testImplementation("junit:junit:4.13.2")
 }
 
 // ---------------------------------------------------------------------------

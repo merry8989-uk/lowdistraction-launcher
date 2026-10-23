@@ -8,10 +8,13 @@ import android.os.Environment
 import android.provider.Settings
 import com.lowdistraction.launcher.bubble.BubblePrefs
 import com.lowdistraction.launcher.bubble.FloatingBubbleService
+import java.io.ByteArrayOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 /**
  * Gathers everything worth knowing about this install and renders it as a
@@ -161,7 +164,9 @@ object DiagnosticsReport {
 
     // --------------------------------------------------------- user-friendliness
     /** The friction signals the shared standard asks for, counted. */
-    private fun signalRows(events: List<Diag.Event>): List<Row> {
+    // internal, not private: the unit tests in app/src/test exercise the counts
+    // and the intent→outcome pairing directly.
+    internal fun signalRows(events: List<Diag.Event>): List<Row> {
         fun count(name: String) = events.count { it.name == name }
         val out = ArrayList<Row>()
         out.add(Row("Sessions in log", count("session_start").toString()))
@@ -175,7 +180,7 @@ object DiagnosticsReport {
 
         val depths = events.filter { it.name == "scroll_depth" }
             .mapNotNull { it.props["percent"]?.toIntOrNull() }
-        out.add(Row("Deepest scroll", if (depths.isEmpty()) "—" else depths.max().toString() + "%"))
+        out.add(Row("Deepest scroll", if (depths.isEmpty()) "—" else depths.maxOrNull().toString() + "%"))
 
         val ttfv = events.lastOrNull { it.name == "time_to_first_value" }
             ?.props?.get("duration_ms")
@@ -198,7 +203,7 @@ object DiagnosticsReport {
      * The rule the standard exists for: a log must capture intent *and* outcome.
      * Anything requested without a matching result is called out here.
      */
-    private fun healthRows(events: List<Diag.Event>): List<Row> {
+    internal fun healthRows(events: List<Diag.Event>): List<Row> {
         fun pair(intent: String, result: String, label: String): List<Row> {
             val intents = events.count { it.name == intent }
             val results = events.count { it.name == result }
@@ -312,7 +317,7 @@ object DiagnosticsReport {
             sb.append("  (nothing recorded yet)\n")
         } else {
             for (e in r.events) {
-                sb.append(Diag.stamp(e.time)).append("  ").append(e.level.padEnd(5)).append(" ")
+                sb.append(LogFormat.stamp(e.time)).append("  ").append(e.level.padEnd(5)).append(" ")
                     .append(e.name)
                 for ((k, v) in e.props) sb.append("  ").append(k).append('=').append(v)
                 sb.append("\n")
@@ -356,7 +361,7 @@ object DiagnosticsReport {
         } else {
             sb.append("```text\n")
             for (e in r.events) {
-                sb.append(Diag.stamp(e.time)).append("  ").append(e.level.padEnd(5)).append(" ")
+                sb.append(LogFormat.stamp(e.time)).append("  ").append(e.level.padEnd(5)).append(" ")
                     .append(e.name)
                 for ((k, v) in e.props) sb.append("  ").append(k).append('=').append(v)
                 sb.append("\n")
@@ -402,6 +407,35 @@ object DiagnosticsReport {
     }
 
     /** One row per event, with every property as a column. */
+    /** One report, in whichever shape was asked for. */
+    fun render(r: Report, ext: String): String = when (ext) {
+        "md" -> renderMarkdown(r)
+        "json" -> renderJson(r)
+        "csv" -> renderCsv(r)
+        else -> renderText(r)
+    }
+
+    /**
+     * All four shapes in one archive, so a single file carries everything.
+     *
+     * Pure, like the other renderers, and covered by a unit test that unzips the
+     * result and compares each entry with the matching renderer.
+     */
+    fun renderZip(r: Report): ByteArray {
+        val out = ByteArrayOutputStream()
+        ZipOutputStream(out).use { zip ->
+            for (ext in TEXT_FORMATS) {
+                zip.putNextEntry(ZipEntry("lowdistraction-diagnostics.$ext"))
+                zip.write(render(r, ext).toByteArray(Charsets.UTF_8))
+                zip.closeEntry()
+            }
+        }
+        return out.toByteArray()
+    }
+
+    /** The four text shapes; a .zip bundles exactly these. */
+    val TEXT_FORMATS = arrayOf("txt", "md", "json", "csv")
+
     fun renderCsv(r: Report): String {
         val columns = ArrayList<String>()
         for (k in listOf(
@@ -417,7 +451,7 @@ object DiagnosticsReport {
         sb.append(columns.joinToString(",") { csv(it) }).append('\n')
         for (e in r.events) {
             val cells = ArrayList<String>()
-            cells.add(Diag.stamp(e.time))
+            cells.add(LogFormat.stamp(e.time))
             cells.add(e.level)
             cells.add(e.category)
             cells.add(e.name)
@@ -496,23 +530,8 @@ object DiagnosticsReport {
         else -> bytes.toString() + " B"
     }
 
-    private fun mdCell(s: String): String =
-        s.replace("|", "\\|").replace("\n", " ").ifEmpty { "—" }
-
-    private fun csv(s: String): String = "\"" + s.replace("\"", "\"\"") + "\""
-
-    private fun json(s: String): String {
-        val sb = StringBuilder("\"")
-        for (ch in s) {
-            when (ch) {
-                '"' -> sb.append("\\\"")
-                '\\' -> sb.append("\\\\")
-                '\n' -> sb.append("\\n")
-                '\r' -> sb.append("\\r")
-                '\t' -> sb.append("\\t")
-                else -> if (ch < ' ') sb.append(String.format(Locale.US, "\\u%04x", ch.code)) else sb.append(ch)
-            }
-        }
-        return sb.append('"').toString()
-    }
+    // The three encodings live in LogFormat, where they are unit-tested.
+    private fun mdCell(s: String): String = LogFormat.markdown(s)
+    private fun csv(s: String): String = LogFormat.csv(s)
+    private fun json(s: String): String = LogFormat.json(s)
 }
