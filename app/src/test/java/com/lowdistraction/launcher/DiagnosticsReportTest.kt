@@ -48,6 +48,25 @@ class DiagnosticsReportTest {
         rawEvents = emptyList()
     )
 
+    /** The same report, but with the stored JSON lines to hand as well. */
+    private fun reportWithRaw(raw: List<String>, vararg events: Diag.Event) =
+        DiagnosticsReport.Report(
+            generatedAt = when0,
+            appName = "Low Distraction",
+            version = "1.36",
+            versionCode = 37L,
+            enabled = true,
+            schemaVersion = "1.1.0",
+            sections = listOf(
+                DiagnosticsReport.Section(
+                    "App",
+                    listOf(DiagnosticsReport.Row("Version", "1.36 (37)"))
+                )
+            ),
+            events = events.toList(),
+            rawEvents = raw
+        )
+
     // ------------------------------------------------------------------- csv
 
     @Test
@@ -103,6 +122,24 @@ class DiagnosticsReportTest {
             report(event("settings_changed", mapOf("value" to "a\"b\\c")))
         )
         assertTrue(json.contains("a\\\"b\\\\c"))
+    }
+
+    @Test
+    fun `json uses the stored lines verbatim when they are present`() {
+        val raw = "{\"event_name\": \"crash\", \"cold_start_ms\": 412}"
+        val json = DiagnosticsReport.renderJson(reportWithRaw(listOf(raw), event("crash")))
+        // The stored line is emitted as it stands, so a number stays a number.
+        assertTrue(json.contains(raw))
+    }
+
+    @Test
+    fun `json never claims nothing happened when events exist`() {
+        // The stored lines are absent, so the events are rebuilt. An empty
+        // events array here would contradict the text, CSV and markdown exports.
+        val json = DiagnosticsReport.renderJson(report(event("screen_view")))
+        assertTrue(json.contains("\"event_name\": \"screen_view\""))
+        assertTrue(json.contains("\"category\": \"activity\""))
+        assertTrue(json.contains("\"screen_or_route\": \"Home\""))
     }
 
     // ------------------------------------------------------------------- zip

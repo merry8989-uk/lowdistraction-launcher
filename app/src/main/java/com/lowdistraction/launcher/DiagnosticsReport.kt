@@ -398,12 +398,30 @@ object DiagnosticsReport {
             sb.append("      ]\n    }").append(if (si == r.sections.size - 1) "\n" else ",\n")
         }
         sb.append("  ],\n")
+        // Prefer the stored lines: they are the exact records, numbers still
+        // numbers. If they are not to hand, build from the parsed events rather
+        // than emit an empty array — the two must never disagree about whether
+        // anything was recorded.
+        val lines = if (r.rawEvents.isNotEmpty()) r.rawEvents else r.events.map { eventJson(it) }
         sb.append("  \"events\": [\n")
-        for ((i, raw) in r.rawEvents.withIndex()) {
-            sb.append("    ").append(raw).append(if (i == r.rawEvents.size - 1) "\n" else ",\n")
+        for ((i, raw) in lines.withIndex()) {
+            sb.append("    ").append(raw).append(if (i == lines.size - 1) "\n" else ",\n")
         }
         sb.append("  ]\n}\n")
         return sb.toString()
+    }
+
+    /** One parsed event as a JSON object, for when the stored lines are absent. */
+    private fun eventJson(e: Diag.Event): String {
+        val sb = StringBuilder("{")
+        sb.append("\"event_name\": ").append(json(e.name))
+        sb.append(", \"timestamp\": ").append(json(LogFormat.isoUtc(e.time)))
+        sb.append(", \"log_level\": ").append(json(e.level))
+        sb.append(", \"category\": ").append(json(e.category))
+        sb.append(", \"screen_or_route\": ").append(json(e.screen))
+        sb.append(", \"session_id\": ").append(json(e.session))
+        for ((k, v) in e.props) sb.append(", ").append(json(k)).append(": ").append(json(v))
+        return sb.append("}").toString()
     }
 
     /** One row per event, with every property as a column. */
