@@ -314,7 +314,10 @@ class DiagnosticsReportTest {
         val rows = DiagnosticsReport.crashRows(listOf(event("crash", level = "fatal")))
         val byKey = rows.associate { it.key to it.value }
         assertEquals("—", byKey["  trace"])
-        assertEquals("unknown", byKey.values.first())
+        assertEquals("—", byKey["  screen"])
+        // The crash's own row is keyed by its time; with no exception_type it
+        // still says something rather than an empty cell.
+        assertEquals("unknown", byKey[LogFormat.stamp(when0)])
     }
 
     @Test
