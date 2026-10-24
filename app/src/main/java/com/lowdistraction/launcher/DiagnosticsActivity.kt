@@ -113,6 +113,15 @@ class DiagnosticsActivity : Activity() {
         }
         column.addView(summary)
 
+        // The explorer first: the log is only useful if it can be read.
+        val row0 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        row0.addView(button(getString(R.string.diag_explore), theme, accent = true) {
+            startActivity(Intent(this, LogExplorerActivity::class.java))
+        })
+        column.addView(row0)
+
+        column.addView(spacerH(dp(10)))
+
         // Row 1 — refresh / clean
         val row1 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         row1.addView(button(getString(R.string.diag_refresh), theme) { refresh() })

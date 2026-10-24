@@ -334,4 +334,14 @@
     <string name="diag_no_mail">No mail app found. The report is ready — send it to %1$s from any app.</string>
     <string name="diag_failed">Could not build the report</string>
     <string name="diag_building">Building the report…</string>
+
+    <!-- Log explorer -->
+    <string name="diag_explore">Log explorer</string>
+    <string name="explorer_title">Log explorer</string>
+    <string name="explorer_severity">SEVERITY</string>
+    <string name="explorer_category">CATEGORY</string>
+    <string name="explorer_search">SEARCH</string>
+    <string name="explorer_search_hint">name, package, screen, session…</string>
+    <string name="explorer_empty">Nothing recorded yet. Use the app for a while and come back.</string>
+    <string name="explorer_tap">Tap an event to see everything it recorded.</string>
 </resources>

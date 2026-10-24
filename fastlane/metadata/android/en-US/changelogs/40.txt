@@ -1,0 +1,20 @@
+The log now has an explorer — filter it, search it, count it
+
+- Diagnostics gains a Log explorer: filter by severity and by category, and
+  search across everything an event says — its name, category, severity, screen,
+  session, and every property, both the key and the value, so "package" finds the
+  property and "com.whatsapp" finds the app.
+- A line above the list always says how much is showing and how much is being
+  left out, so a screenshot cannot be mistaken for the whole log.
+- The whole log's shape is printed as counts: every severity and every category,
+  including the ones sitting at zero. "No errors" is an answer.
+- Tap any event to see everything it recorded, grouped the way it is stored:
+  context, correlation, error, metrics and attributes.
+- Severity is coloured from your theme, so errors read as errors in both light
+  and dark themes without breaking either.
+- All the deciding — matching, counting, summarising — lives in one small file
+  free of Android, and 21 new unit tests cover it. The screen only draws what
+  that decides.
+- Nothing new is collected and nothing is uploaded. The explorer reads the log
+  that is already on the phone, which is the only kind of dashboard this app can
+  honestly have.

@@ -107,6 +107,14 @@
             android:excludeFromRecents="true"
             android:theme="@style/Theme.LowDistraction" />
 
+        <!-- The log explorer: filter, search and count what has already been
+             recorded. Reads the app's own log and nothing else. -->
+        <activity
+            android:name=".LogExplorerActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.LowDistraction" />
+
         <activity
             android:name=".AppearanceActivity"
             android:exported="false"
