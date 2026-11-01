@@ -61,7 +61,11 @@ android {
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.13.1")
+    // Pinned at 1.12.0: the 1.13.x line pulls in androidx.profileinstaller, whose
+    // ProfileInstallReceiver merges into the manifest as an exported component.
+    // MainActivity must stay the only exported entry point, so that move needs a
+    // deliberate manifest guard, not a routine bump.
+    implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.recyclerview:recyclerview:1.3.2")
 
     // The logging pipeline's pure half — encodings, redaction, the report
