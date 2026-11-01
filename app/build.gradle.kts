@@ -61,7 +61,7 @@ android {
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.12.0")
+    implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.recyclerview:recyclerview:1.3.2")
 
     // The logging pipeline's pure half — encodings, redaction, the report

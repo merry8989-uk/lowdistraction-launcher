@@ -199,8 +199,8 @@ app, which opens that same system screen).
 
 - Android SDK Platform **34** and Build-Tools **34.0.0**
 - JDK 17
-- Gradle 8.x (the wrapper pins **8.2**)
-- Android Gradle Plugin **8.1.4**, Kotlin **1.9.22**
+- Gradle 8.x (the wrapper pins **8.14.6**)
+- Android Gradle Plugin **8.1.4**, Kotlin **1.9.25**
 - `minSdk 26` (Android 8.0), `targetSdk 34`
 
 > **Why 34 and not 35?** Termux's arm64 `aapt2` currently tops out at
